@@ -113,6 +113,10 @@ render superset/setup.sh.tmpl .superset/setup.sh; chmod +x .superset/setup.sh
 [ -f .superset/teardown.sh ] || { cp "$SKEIN_HOME/templates/superset/teardown.sh" .superset/teardown.sh; chmod +x .superset/teardown.sh; log "wrote .superset/teardown.sh"; }
 [ -n "$DEV_CMD" ] && { render superset/run.sh.tmpl .superset/run.sh; chmod +x .superset/run.sh; }
 grep -qx '.superset/config.local.json' .gitignore 2>/dev/null || printf '.superset/config.local.json\n' >> .gitignore
+# Dead-code tools would flag the vendored runtime as unused files; tell knip to skip it.
+if [ -f knip.json ] && ! jq -e --arg v "$VENDOR/**" '(.ignore // []) | index($v)' knip.json >/dev/null 2>&1; then
+  jq --arg v "$VENDOR/**" '.ignore = ((.ignore // []) + [$v] | unique)' knip.json > knip.json.tmp && mv knip.json.tmp knip.json && log "added $VENDOR/** to knip.json ignore"
+fi
 git config core.hooksPath scripts/githooks
 
 cat <<NEXT
