@@ -57,8 +57,21 @@ driver_wait_setup() {
 
 driver_path() { superset ws get "$1" --json 2>/dev/null | jq -r '.worktreePath // empty'; }
 
+# Interactive Claude Code asks whether to trust a folder it has not seen, and arrow keys do
+# not arrive through `terminals send`. Trust is per path in ~/.claude.json, so record the
+# worktree there before launching. (Headless `claude -p`, the local driver, never asks.)
+_pretrust_claude() {
+  local path="$1" cfg="$HOME/.claude.json" tmp
+  [ -n "$path" ] || return 0
+  [ -f "$cfg" ] || printf '{}' > "$cfg"
+  tmp="$(mktemp)"
+  jq --arg p "$path" '.projects = (.projects // {}) | .projects[$p] = ((.projects[$p] // {}) + {hasTrustDialogAccepted: true})' "$cfg" > "$tmp" \
+    && mv "$tmp" "$cfg" || { rm -f "$tmp"; warn "could not pre-trust $path in $cfg"; }
+}
+
 driver_launch() {
   local ws="$1" agent="$2" model="$3" effort="$4" prompt="$5" a term t started="" attempt cmd
+  [ "$agent" = "claude" ] && _pretrust_claude "$(driver_path "$ws")"
   local args=(--workspace "$ws" --agent "$agent" --json --prompt "$prompt")
   [ -n "$model" ] && [ "$model" != "-" ] && args+=(--model "$model")
   [ -n "$effort" ] && [ "$agent" = "claude" ] && args+=(--effort "$effort")
