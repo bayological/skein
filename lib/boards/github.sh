@@ -42,15 +42,16 @@ board_claim() {
     url="$(gh issue create -R "$BOARD_REPO" --title "$id: $title" --label skein --label state:running --assignee "$me" \
       --body "Task \`$id\` in \`$(cfg .plan docs/plan/wps.json)\`. Branch \`$branch\`. Claimed by @$me via skein dispatch." 2>/dev/null)" \
       || die "could not create the board issue for $id"
-    # Creation is not atomic across coordinators: if two issues now exist for this id, the
-    # lower number wins and the loser closes its own.
-    local mine all
+    # Creation is not atomic across coordinators: if another open issue for this id has a
+    # LOWER number than ours, it won and we close ours. The listing can lag a fresh create,
+    # so an empty or partial list is not evidence against us.
+    local mine lower
     mine="${url##*/}"
-    all="$(gh issue list -R "$BOARD_REPO" --state open --label skein --limit 200 --json number,title 2>/dev/null \
-      | jq -r --arg id "$id" '[.[] | select(.title | ascii_downcase | startswith(($id|ascii_downcase) + ":"))] | map(.number) | sort | .[]')"
-    if [ "$(head -1 <<<"$all")" != "$mine" ]; then
-      gh issue close "$mine" -R "$BOARD_REPO" --comment "Duplicate claim; #$(head -1 <<<"$all") won." >/dev/null 2>&1
-      die "$id was claimed by another coordinator at the same moment (issue #$(head -1 <<<"$all"))"
+    lower="$(gh issue list -R "$BOARD_REPO" --state open --label skein --limit 200 --json number,title 2>/dev/null \
+      | jq -r --arg id "$id" --argjson mine "$mine" '[.[] | select((.title | ascii_downcase | startswith(($id|ascii_downcase) + ":")) and .number < $mine)] | map(.number) | min // empty')"
+    if [ -n "$lower" ]; then
+      gh issue close "$mine" -R "$BOARD_REPO" --comment "Duplicate claim; #$lower won." >/dev/null 2>&1
+      die "$id was claimed by another coordinator at the same moment (issue #$lower)"
     fi
     printf '%s\n' "$url"
     return 0
