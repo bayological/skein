@@ -58,11 +58,13 @@ board_claim() {
 }
 
 board_release() {
-  local id="$1" state="${2:-gating}" issue num
+  # ready = back on the shelf for anyone (assignee cleared); gating/blocked keep the claim.
+  local id="$1" state="${2:-gating}" issue num extra=()
   issue="$(_issue_for "$id")"; [ -n "$issue" ] || return 0
   num="$(jq -r .number <<<"$issue")"; _ensure_labels
+  [ "$state" = ready ] && extra=(--remove-assignee "$(me)")
   gh issue edit "$num" -R "$BOARD_REPO" --remove-label state:running --remove-label state:gating \
-    --remove-label state:blocked --remove-label state:ready --add-label "state:$state" >/dev/null 2>&1 || true
+    --remove-label state:blocked --remove-label state:ready --add-label "state:$state" "${extra[@]}" >/dev/null 2>&1 || true
 }
 
 board_close() {
@@ -80,7 +82,7 @@ board_running_count() {
 
 board_list() {
   gh issue list -R "$BOARD_REPO" --state open --label skein --limit 200 --json title,url,assignees,labels 2>/dev/null \
-    | jq -r '.[] | [(.title|split(":")[0]), ((.labels[]?.name|select(startswith("state:"))|sub("state:";"")) // "none"), (.assignees[0].login // "-"), .url] | @tsv'
+    | jq -r '.[] | [(.title|split(":")[0]), (([.labels[]?.name | select(startswith("state:")) | sub("state:";"")] | first) // "none"), (.assignees[0].login // "-"), .url] | @tsv'
 }
 
 board_comment() {
