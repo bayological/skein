@@ -36,7 +36,22 @@ git -C "$ROOT" fetch -q origin 2>/dev/null
 git -C "$ROOT" diff --quiet "origin/$BASE" -- "$(task_field "$t" brief)" "$PLAN" 2>/dev/null \
   || fail "brief or plan differs from origin/$BASE: push $BASE first (workspaces fork from origin)"
 
-# 2. Caps, then the claim. The claim is the lock between coordinators.
+# 2. A leftover branch from an earlier dispatch: harmless if it has no commits of its own
+#    (delete it so the workspace forks from today's origin), a stop if it has work on it.
+git -C "$ROOT" fetch -q origin 2>/dev/null
+for ref in "refs/heads/$BRANCH" "refs/remotes/origin/$BRANCH"; do
+  git -C "$ROOT" show-ref --verify --quiet "$ref" || continue
+  if git -C "$ROOT" merge-base --is-ancestor "$ref" "origin/$BASE"; then
+    case "$ref" in
+      refs/heads/*) git -C "$ROOT" branch -q -D "$BRANCH" && log "deleted stale local branch $BRANCH (no commits of its own)" ;;
+      *) env "$COORD_ENV=1" git -C "$ROOT" push -q origin --delete "$BRANCH" 2>/dev/null && log "deleted stale remote branch $BRANCH (no commits of its own)" ;;
+    esac
+  else
+    fail "branch $BRANCH already exists with commits on it: resume that work (skein status) or delete the branch first"
+  fi
+done
+
+# 3. Caps, then the claim. The claim is the lock between coordinators.
 capmsg="$(check_caps)" || fail "$capmsg"
 log "$capmsg"
 BOARD_URL="$(board_claim "$ID" "$TITLE" "$BRANCH")" || exit 1
@@ -45,7 +60,7 @@ CLAIMED=1
 # so recount now that ours is on the board and back out if the repo is over its cap.
 [ "$(board_running_count)" -le "$(repo_cap)" ] || fail "repo cap exceeded after claiming ($(board_running_count) > $(repo_cap)); claim released, try again later"
 
-# 3. Workspace, setup, sanity.
+# 4. Workspace, setup, sanity.
 created="$(driver_create "$WS_NAME" "$BRANCH" "$BASE" "$TAG")" || fail "workspace creation failed"
 WS="$(jq -r .ws <<<"$created")"; SETUP="$(jq -r .setup <<<"$created")"
 driver_wait_setup "$WS" "$SETUP" "$(cfg .setupTimeout 300)" || fail "setup failed in workspace $WS (see its setup output)"
@@ -55,7 +70,7 @@ git -C "$PATH_WS" fetch -q origin 2>/dev/null
 HEAD="$(git -C "$PATH_WS" rev-parse --short HEAD)"; MAIN="$(git -C "$PATH_WS" rev-parse --short "origin/$BASE")"
 [ "$HEAD" = "$MAIN" ] || fail "workspace HEAD $HEAD is not origin/$BASE $MAIN"
 
-# 4. The worker prompt: fixed, bounded, and the same for every task.
+# 5. The worker prompt: fixed, bounded, and the same for every task.
 PROMPT="$(cfg .workerPrompt)"
 [ -n "$PROMPT" ] || PROMPT="You are worker {ID} in a multi-agent build of {NAME}. Read AGENTS.md, then {BRIEF}, and follow the brief exactly. Work only in this workspace and on this branch. Your gate is \`{GATE} {ID}\`; do not use any other workflow or skill to test, review or ship. When the gate passes, push the branch, open a draft pull request, and end your final message with the completion envelope described in AGENTS.md. Never merge a pull request."
 PROMPT="${PROMPT//\{ID\}/$ID}"; PROMPT="${PROMPT//\{NAME\}/$(cfg .name "$(basename "$ROOT")")}"
