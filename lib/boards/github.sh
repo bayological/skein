@@ -26,7 +26,9 @@ _ensure_labels() {
 }
 
 _issue_for() {  # _issue_for <ID> -> json {number,url,assignees,labels} or empty
-  gh issue list -R "$BOARD_REPO" --state open --label skein --search "\"$1:\" in:title" --limit 20 \
+  # Listed, not searched: GitHub's search index lags several seconds behind a create,
+  # which made a fresh claim look unowned on the very next call.
+  gh issue list -R "$BOARD_REPO" --state open --label skein --limit 200 \
     --json number,title,url,assignees,labels 2>/dev/null \
     | jq -c --arg id "$1" '[.[] | select(.title | ascii_downcase | startswith(($id|ascii_downcase) + ":"))] | .[0] // empty'
 }
