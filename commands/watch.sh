@@ -1,14 +1,16 @@
 #!/usr/bin/env bash
-# skein watch <TASK> [ws] [term] [max-hours] [poll-seconds] [marker]
+# skein watch <TASK> [ws] [term] [max-hours] [poll-seconds] [marker] [--resume]
 # Poll one worker until it emits a completion envelope naming this task, vanishes, or
-# times out. Envelopes already on screen when the watch starts are ignored, so start it
-# BEFORE sending a follow-up prompt. Prints SKEIN_WATCH task=<id> outcome=DONE|BLOCKED|…
+# times out. With --resume, envelopes already on screen when the watch starts are ignored
+# (a resumed session still shows its last round's envelope): start it BEFORE sending the
+# follow-up prompt. Prints SKEIN_WATCH task=<id> outcome=DONE|BLOCKED|…
 . "$SKEIN_HOME/lib/common.sh"; require_config; load_driver
 need jq node
-TASK="${1:-}"; [ -n "$TASK" ] || die "usage: skein watch <TASK> [ws] [term] [max-hours] [poll-s] [marker]"
+RESUME=""; args=(); for a in "$@"; do [ "$a" = "--resume" ] && RESUME=1 || args+=("$a"); done; set -- "${args[@]}"
+TASK="${1:-}"; [ -n "$TASK" ] || die "usage: skein watch <TASK> [ws] [term] [max-hours] [poll-s] [marker] [--resume]"
 ID="$(task_id_norm "$TASK")"
-WS="${2:-$(driver_find "$ID")}"; [ -n "$WS" ] || die "no workspace found for $ID"
-TERM_ID="${3:-$(driver_agent_terminal "$WS")}"; [ -n "$TERM_ID" ] || die "no agent terminal in workspace $WS"
+WS="${2:-}"; { [ -z "$WS" ] || [ "$WS" = "-" ]; } && WS="$(driver_find "$ID")"; [ -n "$WS" ] || die "no workspace found for $ID"
+TERM_ID="${3:-}"; { [ -z "$TERM_ID" ] || [ "$TERM_ID" = "-" ]; } && TERM_ID="$(driver_agent_terminal "$WS")"; [ -n "$TERM_ID" ] || die "no agent terminal in workspace $WS"
 MAX_H="${4:-8}"; EVERY="${5:-120}"; MARKER="${6:-}"
 DIR="${SKEIN_STATE_DIR:-${TMPDIR:-/tmp}/skein-$(basename "$ROOT")}"; mkdir -p "$DIR"
 LOG="$DIR/watch-$ID.log"; SNAP="$DIR/watch-$ID.last.txt"; BASE="$DIR/watch-$ID.baseline.json"; rm -f "$BASE"
@@ -23,7 +25,7 @@ while [ "$(date +%s)" -lt "$deadline" ]; do
   else
     misses=0; printf '%s\n' "$text" > "$SNAP"
     if [ -n "$MARKER" ]; then text="$(MARKER="$MARKER" node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const i=s.lastIndexOf(process.env.MARKER);process.stdout.write(i<0?s:s.slice(i))})' <<<"$text")"; fi
-    mode=check; [ -f "$BASE" ] || mode=init
+    mode=check; if [ ! -f "$BASE" ]; then if [ -n "$RESUME" ]; then mode=init; else echo "[]" > "$BASE"; fi; fi
     verdict="$(printf '%s' "$text" | ENVELOPE="$ENVELOPE" node -e '
       const fs=require("fs");const [task,base,mode]=process.argv.slice(1);let s="";
       process.stdin.on("data",d=>s+=d).on("end",()=>{

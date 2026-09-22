@@ -10,7 +10,7 @@ have_config && ok ".skein/config.json ($(cfg .name), prefix $PREFIX, board $BOAR
 [ -f "$PLAN" ] && ok "plan $PLAN ($(jq '.tasks|length' "$PLAN") tasks)" || bad "plan missing: $PLAN"
 [ -x "$ROOT/$(cfg .vendor scripts/skein)/skein" ] && ok "vendored skein $(cat "$ROOT/$(cfg .vendor scripts/skein)/VERSION" 2>/dev/null)" || bad "vendored scripts missing: run skein init"
 [ "$(git config core.hooksPath)" = "scripts/githooks" ] && ok "hooks path set" || bad "git config core.hooksPath scripts/githooks (not set)"
-git ls-remote --exit-code origin >/dev/null 2>&1 && ok "origin reachable" || bad "origin not reachable"
+git ls-remote origin >/dev/null 2>&1 && ok "origin reachable" || bad "origin not reachable"
 case "$BOARD_TYPE" in
   github) command -v gh >/dev/null && gh auth status >/dev/null 2>&1 && ok "gh authenticated as $(gh api user -q .login 2>/dev/null)" || bad "gh not authenticated (gh auth login)" ;;
   superset) command -v superset >/dev/null && superset auth whoami --json >/dev/null 2>&1 && ok "superset authenticated" || bad "superset CLI not authenticated (superset auth login)" ;;

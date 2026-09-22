@@ -26,12 +26,14 @@ driver_create() {
   else
     git -C "$ROOT" worktree add -q -b "$branch" "$path" "origin/$base" || die "git worktree add failed (is origin/$base fetched?)"
   fi
-  printf '%s\n' "$name" > "$path/.skein-workspace"
-  printf '%s\n' "$tag"  > "$path/.skein-tag"
+  # Driver state lives OUTSIDE the worktree: anything inside shows as untracked, and a
+  # worker chasing a clean tree for the gate will delete it (seen on the first run).
+  local meta="$RUN_ROOT/$(basename "$path").meta.json" setuplog="$RUN_ROOT/$(basename "$path").setup.log"
+  jq -n --arg name "$name" --arg tag "$tag" --arg path "$path" --arg branch "$branch" '{name:$name, tag:$tag, path:$path, branch:$branch}' > "$meta"
   # Setup runs synchronously here; wait_setup just checks its log.
   ( cd "$path" && SUPERSET_ROOT_PATH="$ROOT" SUPERSET_WORKSPACE_NAME="$name" SUPERSET_WORKSPACE_PATH="$path" \
-      bash "$SETUP_SCRIPT" ) > "$path/.skein-setup.log" 2>&1
-  emit --arg ws "$path" --arg setup "$path/.skein-setup.log" --arg path "$path" '{ws:$ws, setup:$setup, path:$path}'
+      bash "$SETUP_SCRIPT" ) > "$setuplog" 2>&1
+  emit --arg ws "$path" --arg setup "$setuplog" --arg path "$path" '{ws:$ws, setup:$setup, path:$path}'
 }
 
 driver_wait_setup() {
@@ -71,7 +73,7 @@ driver_send() {
   ( cd "$1" && setsid claude -p "$text" --resume "$sid" --dangerously-skip-permissions --output-format stream-json --verbose >> "$log" 2>&1 & echo $! > "$log.pid" )
 }
 
-driver_tag() { printf '%s\n' "$2" > "$1/.skein-tag"; }
+driver_tag() { local m="$RUN_ROOT/$(basename "$1").meta.json"; [ -f "$m" ] && { jq --arg t "$2" '.tag=$t' "$m" > "$m.tmp" && mv "$m.tmp" "$m"; }; return 0; }
 
 driver_delete() {
   local ws="$1" log pid
@@ -80,13 +82,14 @@ driver_delete() {
   [ -x "$ws/.superset/teardown.sh" ] && ( cd "$ws" && SUPERSET_WORKSPACE_PATH="$ws" bash .superset/teardown.sh ) >/dev/null 2>&1
   git -C "$ROOT" worktree remove --force "$ws" 2>/dev/null || rm -rf "$ws"
   git -C "$ROOT" worktree prune
+  rm -f "$RUN_ROOT/$(basename "$ws").meta.json" "$RUN_ROOT/$(basename "$ws").setup.log" "$log.pid"
 }
 
 driver_list() {
-  local d
-  for d in "$WT_ROOT"/*/; do
-    [ -f "$d/.skein-workspace" ] || continue
-    printf '%s\t%s\t%s\t%s\n' "${d%/}" "$(cat "$d/.skein-workspace")" "${d%/}" "$(cat "$d/.skein-tag" 2>/dev/null)"
+  local m
+  for m in "$RUN_ROOT"/*.meta.json; do
+    [ -f "$m" ] || continue
+    jq -r '[.path, .name, .path, .tag] | @tsv' "$m"
   done
 }
 driver_find() { driver_list | awk -F'\t' -v id="($1)" 'index($2, id) {print $1; exit}'; }
