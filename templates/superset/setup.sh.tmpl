@@ -8,19 +8,21 @@ ROOT="${SUPERSET_ROOT_PATH:-}"
 WS_NAME="${SUPERSET_WORKSPACE_NAME:-workspace}"
 [ -n "$ROOT" ] || { echo "SUPERSET_ROOT_PATH not set; run this via Superset or skein." >&2; exit 1; }
 
-# 1. Env files are gitignored: copy each from the main checkout, never overwriting one the
-#    workspace already has. Lines matching ENV_WITHHOLD are blanked so a worker never holds
-#    a production credential it does not need (edit the pattern for this project).
+# 1. Env files are gitignored. By default a workspace gets only the committed `.env.example`
+#    (names, no secrets): a worker runs with the credentials the repo chose to give it, not
+#    whatever the main checkout holds. A repo that needs real values sets ENV_COPY_REAL=1
+#    and lists in ENV_WITHHOLD (an ERE of variable names) what must still be blanked.
+ENV_COPY_REAL={{ENV_COPY_REAL}}
 ENV_WITHHOLD='{{ENV_WITHHOLD}}'
 copy_env() {
   local rel="$1"
   if [ -f "$rel" ]; then echo "env: $rel already present"
-  elif [ -f "$ROOT/$rel" ]; then
+  elif [ "$ENV_COPY_REAL" = 1 ] && [ -f "$ROOT/$rel" ]; then
     mkdir -p "$(dirname "$rel")"
     if [ -n "$ENV_WITHHOLD" ]; then sed -E "s|^($ENV_WITHHOLD)=.*|\1=  # skein workspace: withheld|" "$ROOT/$rel" > "$rel"; else cp "$ROOT/$rel" "$rel"; fi
-    chmod 600 "$rel"; echo "env: copied $rel from main checkout"
-  elif [ -f "$rel.example" ]; then cp "$rel.example" "$rel"; echo "env: $rel created from $rel.example (fill in values)"
-  else echo "env: no $rel in main checkout; skipping"; fi
+    chmod 600 "$rel"; echo "env: copied $rel from main checkout${ENV_WITHHOLD:+ (withheld: $ENV_WITHHOLD)}"
+  elif [ -f "$rel.example" ]; then cp "$rel.example" "$rel"; echo "env: $rel created from $rel.example"
+  else echo "env: no $rel.example; skipping"; fi
 }
 for f in {{ENV_FILES}}; do copy_env "$f"; done
 

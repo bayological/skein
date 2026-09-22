@@ -23,7 +23,7 @@ case "$DRIVER_TYPE" in
     else bad "superset CLI not usable: is the desktop app running and logged in?"; fi ;;
   local) command -v claude >/dev/null && ok "claude on PATH (local driver)" || bad "claude CLI missing" ;;
 esac
-command -v codex >/dev/null && ok "codex on PATH (cross-model review)" || printf '  \033[33m•\033[0m codex not installed: skein review falls back to claude %s\n' "$(cfg .review.fallbackModel)"
+codex --version >/dev/null 2>&1 && ok "codex $(codex --version 2>/dev/null | head -1) (cross-model review)" || printf '  \033[33m•\033[0m codex not installed: skein review falls back to claude %s\n' "$(cfg .review.fallbackModel)"
 . "$SKEIN_HOME/lib/caps.sh"; ok "caps: machine $(machine_cap) ($USER_CONFIG), repo $(repo_cap) (.skein/config.json)"
 [ "$(jq '.standard|length' "$CONFIG")" -gt 0 ] && ok "standard: $(jq -r '.standard|join(" && ")' "$CONFIG")" || bad "no standard commands: the gate cannot judge work"
 [ "$FAILS" -eq 0 ] && echo "all good" || { echo "$FAILS problem(s)"; exit 1; }

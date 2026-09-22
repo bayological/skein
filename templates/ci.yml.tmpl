@@ -11,6 +11,9 @@ concurrency:
   group: skein-gate-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
   gate:
     runs-on: ubuntu-latest
@@ -18,11 +21,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          persist-credentials: false
 {{CI_SETUP}}
       - run: {{INSTALL}}
       - name: task gate (pull request)
         if: github.event_name == 'pull_request'
-        run: {{VENDOR}}/skein gate --from-branch --only brief,boundary,secrets,test-integrity,invariants,standard
+        run: {{VENDOR}}/skein gate --from-branch --only brief,boundary,secrets,test-integrity,invariants,standard,accept
       - name: standard ({{BASE}})
         if: github.event_name == 'push'
         run: {{VENDOR}}/skein gate --standard-only

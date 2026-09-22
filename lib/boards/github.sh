@@ -38,9 +38,21 @@ board_claim() {
   me="$(me)"; _ensure_labels
   issue="$(_issue_for "$id")"
   if [ -z "$issue" ]; then
-    gh issue create -R "$BOARD_REPO" --title "$id: $title" --label skein --label state:running --assignee "$me" \
-      --body "Task \`$id\` in \`$(cfg .plan docs/plan/wps.json)\`. Branch \`$branch\`. Claimed by @$me via skein dispatch." 2>/dev/null \
+    local url
+    url="$(gh issue create -R "$BOARD_REPO" --title "$id: $title" --label skein --label state:running --assignee "$me" \
+      --body "Task \`$id\` in \`$(cfg .plan docs/plan/wps.json)\`. Branch \`$branch\`. Claimed by @$me via skein dispatch." 2>/dev/null)" \
       || die "could not create the board issue for $id"
+    # Creation is not atomic across coordinators: if two issues now exist for this id, the
+    # lower number wins and the loser closes its own.
+    local mine all
+    mine="${url##*/}"
+    all="$(gh issue list -R "$BOARD_REPO" --state open --label skein --limit 200 --json number,title 2>/dev/null \
+      | jq -r --arg id "$id" '[.[] | select(.title | ascii_downcase | startswith(($id|ascii_downcase) + ":"))] | map(.number) | sort | .[]')"
+    if [ "$(head -1 <<<"$all")" != "$mine" ]; then
+      gh issue close "$mine" -R "$BOARD_REPO" --comment "Duplicate claim; #$(head -1 <<<"$all") won." >/dev/null 2>&1
+      die "$id was claimed by another coordinator at the same moment (issue #$(head -1 <<<"$all"))"
+    fi
+    printf '%s\n' "$url"
     return 0
   fi
   num="$(jq -r .number <<<"$issue")"
@@ -54,6 +66,14 @@ board_claim() {
   gh issue edit "$num" -R "$BOARD_REPO" --add-assignee "$me" --add-label state:running \
     --remove-label state:ready --remove-label state:gating --remove-label state:blocked >/dev/null 2>&1 \
     || die "could not claim issue #$num"
+  # Assignment is not atomic either: re-read and verify we are the only assignee. If someone
+  # else landed at the same time, the lower login wins deterministically and we back out.
+  local assignees
+  assignees="$(gh issue view "$num" -R "$BOARD_REPO" --json assignees -q '[.assignees[].login] | sort | .[]' 2>/dev/null)"
+  if [ "$(wc -l <<<"$assignees" | tr -d ' ')" -gt 1 ] && [ "$(head -1 <<<"$assignees")" != "$me" ]; then
+    gh issue edit "$num" -R "$BOARD_REPO" --remove-assignee "$me" >/dev/null 2>&1
+    die "$id was claimed by @$(head -1 <<<"$assignees") at the same moment (issue #$num)"
+  fi
   jq -r .url <<<"$issue"
 }
 

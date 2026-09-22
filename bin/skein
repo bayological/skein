@@ -5,7 +5,13 @@
 # (scripts/skein/skein). Commands live in ../commands, shared code in ../lib.
 set -uo pipefail
 
-SELF="$(readlink -f "${BASH_SOURCE[0]}")"
+# Resolve this script through symlinks without `readlink -f`, which BSD readlink (macOS) lacks.
+SELF="${BASH_SOURCE[0]}"
+while [ -L "$SELF" ]; do
+  target="$(readlink "$SELF")"
+  case "$target" in /*) SELF="$target" ;; *) SELF="$(dirname "$SELF")/$target" ;; esac
+done
+SELF="$(cd "$(dirname "$SELF")" && pwd -P)/$(basename "$SELF")"
 SKEIN_HOME="$(cd "$(dirname "$SELF")/.." && pwd -P)"
 # A vendored copy keeps bin/ flat: scripts/skein/skein next to lib/ and commands/.
 [ -d "$SKEIN_HOME/commands" ] || SKEIN_HOME="$(dirname "$SELF")"

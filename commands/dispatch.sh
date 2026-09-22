@@ -20,7 +20,14 @@ BRANCH="$(task_branch "$t")"; WS_NAME="$(task_ws_name "$t")"
 GATE="$(cfg .gate 'scripts/skein/skein gate')"
 BASE="$(cfg .baseBranch main)"
 
-fail() { emit --arg task "$ID" --arg error "$1" '{task:$task, ok:false, error:$error}'; exit 1; }
+CLAIMED=""; WS=""
+# One exit path for every failure: a claim is released (back to ready, assignee cleared) and
+# a half-built workspace is deleted, so a bad dispatch never strands the board or the cap.
+fail() {
+  [ -n "$WS" ] && driver_delete "$WS" 2>/dev/null
+  [ -n "$CLAIMED" ] && board_release "$ID" ready 2>/dev/null
+  emit --arg task "$ID" --arg error "$1" '{task:$task, ok:false, error:$error}'; exit 1
+}
 
 # 1. Dispatchable: brief valid, deps merged, and both on origin (workspaces fork from origin).
 node "$SKEIN_HOME/lib/plan.mjs" --check "$ID" >/dev/null 2>&1 || fail "$(node "$SKEIN_HOME/lib/plan.mjs" --check "$ID" 2>&1 | tr '\n' ' ')"
@@ -33,11 +40,15 @@ git -C "$ROOT" diff --quiet "origin/$BASE" -- "$(task_field "$t" brief)" "$PLAN"
 capmsg="$(check_caps)" || fail "$capmsg"
 log "$capmsg"
 BOARD_URL="$(board_claim "$ID" "$TITLE" "$BRANCH")" || exit 1
+CLAIMED=1
+# Two coordinators can pass the cap check together and both claim. The claim is what counts,
+# so recount now that ours is on the board and back out if the repo is over its cap.
+[ "$(board_running_count)" -le "$(repo_cap)" ] || fail "repo cap exceeded after claiming ($(board_running_count) > $(repo_cap)); claim released, try again later"
 
 # 3. Workspace, setup, sanity.
-created="$(driver_create "$WS_NAME" "$BRANCH" "$BASE" "$TAG")" || { board_release "$ID" ready; exit 1; }
+created="$(driver_create "$WS_NAME" "$BRANCH" "$BASE" "$TAG")" || fail "workspace creation failed"
 WS="$(jq -r .ws <<<"$created")"; SETUP="$(jq -r .setup <<<"$created")"
-driver_wait_setup "$WS" "$SETUP" "$(cfg .setupTimeout 300)" || { board_release "$ID" blocked; fail "setup failed in workspace $WS"; }
+driver_wait_setup "$WS" "$SETUP" "$(cfg .setupTimeout 300)" || fail "setup failed in workspace $WS (see its setup output)"
 PATH_WS="$(driver_path "$WS")"; [ -d "$PATH_WS" ] || fail "cannot find the worktree for $WS_NAME"
 [ -f "$PATH_WS/$(task_field "$t" brief)" ] || fail "brief missing in the worktree (is it on origin/$BASE?)"
 git -C "$PATH_WS" fetch -q origin 2>/dev/null
@@ -50,7 +61,7 @@ PROMPT="$(cfg .workerPrompt)"
 PROMPT="${PROMPT//\{ID\}/$ID}"; PROMPT="${PROMPT//\{NAME\}/$(cfg .name "$(basename "$ROOT")")}"
 PROMPT="${PROMPT//\{BRIEF\}/$(task_field "$t" brief)}"; PROMPT="${PROMPT//\{GATE\}/$GATE}"
 
-TERM_ID="$(driver_launch "$WS" "$AGENT" "$MODEL" "$EFFORT" "$PROMPT")" || { board_release "$ID" blocked; exit 1; }
+TERM_ID="$(driver_launch "$WS" "$AGENT" "$MODEL" "$EFFORT" "$PROMPT")" || fail "the agent did not start"
 board_comment "$ID" "Dispatched by $(me): workspace \`$WS_NAME\`, branch \`$BRANCH\`, agent $AGENT${MODEL:+ ($MODEL)}, head $HEAD."
 emit --arg task "$ID" --arg ws "$WS" --arg term "$TERM_ID" --arg branch "$BRANCH" --arg head "$HEAD" \
      --arg model "$AGENT:$MODEL${EFFORT:+:$EFFORT}" --arg path "$PATH_WS" --arg board "$BOARD_URL" \

@@ -51,16 +51,20 @@ driver_launch() {
   log="$RUN_ROOT/$(basename "$ws").jsonl"; : > "$log"
   local args=(-p "$prompt" --dangerously-skip-permissions --output-format stream-json --verbose)
   [ -n "$model" ] && [ "$model" != "-" ] && args+=(--model "$model")
-  ( cd "$ws" && setsid claude "${args[@]}" >> "$log" 2>&1 & echo $! > "$log.pid" )
+  # stdout is the JSON stream; stderr goes to its own file so one warning line cannot break
+  # the parser. setsid (own process group) where it exists; plain nohup on macOS.
+  ( cd "$ws" && _bg claude "${args[@]}" >> "$log" 2>> "$log.err" & echo $! > "$log.pid" )
+  sleep 2; kill -0 "$(cat "$log.pid")" 2>/dev/null || die "claude exited immediately; see $log.err"
   printf '%s' "$log"
 }
+_bg() { if command -v setsid >/dev/null 2>&1; then setsid "$@"; else nohup "$@"; fi; }
 
 # Render the stream-json log as the text a terminal would show: assistant text blocks,
 # tool names, and the final result.
 driver_read() {
   local log="$2" lines="${3:-240}"
   [ -f "$log" ] || return 0
-  jq -r '
+  jq -R -r 'fromjson? |
     if .type=="assistant" then (.message.content[]? | if .type=="text" then .text elif .type=="tool_use" then "● \(.name)(…)" else empty end)
     elif .type=="result" then "--- result (\(.subtype // "done")) ---\n\(.result // "")"
     else empty end' "$log" 2>/dev/null | tail -n "$lines"
@@ -70,7 +74,7 @@ driver_send() {
   local log="$2" text="$3" sid
   sid="$(jq -r 'select(.type=="system" and .subtype=="init") | .session_id' "$log" 2>/dev/null | head -1)"
   [ -n "$sid" ] || die "no session id in $log yet"
-  ( cd "$1" && setsid claude -p "$text" --resume "$sid" --dangerously-skip-permissions --output-format stream-json --verbose >> "$log" 2>&1 & echo $! > "$log.pid" )
+  ( cd "$1" && _bg claude -p "$text" --resume "$sid" --dangerously-skip-permissions --output-format stream-json --verbose >> "$log" 2>> "$log.err" & echo $! > "$log.pid" )
 }
 
 driver_tag() { local m="$RUN_ROOT/$(basename "$1").meta.json"; [ -f "$m" ] && { jq --arg t "$2" '.tag=$t' "$m" > "$m.tmp" && mv "$m.tmp" "$m"; }; return 0; }
@@ -78,7 +82,7 @@ driver_tag() { local m="$RUN_ROOT/$(basename "$1").meta.json"; [ -f "$m" ] && { 
 driver_delete() {
   local ws="$1" log pid
   log="$RUN_ROOT/$(basename "$ws").jsonl"
-  pid="$(cat "$log.pid" 2>/dev/null)"; [ -n "$pid" ] && kill -- "-$pid" 2>/dev/null
+  pid="$(cat "$log.pid" 2>/dev/null)"; [ -n "$pid" ] && { kill -- "-$pid" 2>/dev/null || kill "$pid" 2>/dev/null; }
   [ -x "$ws/.superset/teardown.sh" ] && ( cd "$ws" && SUPERSET_WORKSPACE_PATH="$ws" bash .superset/teardown.sh ) >/dev/null 2>&1
   git -C "$ROOT" worktree remove --force "$ws" 2>/dev/null || rm -rf "$ws"
   git -C "$ROOT" worktree prune

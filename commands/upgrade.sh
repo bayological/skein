@@ -10,6 +10,8 @@ old="$(cat "$VENDOR/VERSION" 2>/dev/null || echo none)"; new="$(cat "$SKEIN_HOME
 new="$(cat "$SKEIN_HOME/VERSION")"
 rm -rf "$VENDOR/lib" "$VENDOR/commands"; mkdir -p "$VENDOR"
 cp "$SKEIN_HOME/bin/skein" "$VENDOR/skein"; cp -r "$SKEIN_HOME/lib" "$SKEIN_HOME/commands" "$VENDOR/"; cp "$SKEIN_HOME/VERSION" "$VENDOR/VERSION"
-rm -f "$VENDOR/commands/init.sh" "$VENDOR/commands/upgrade.sh"; chmod +x "$VENDOR/skein"
+rm -f "$VENDOR/commands/init.sh" "$VENDOR/commands/upgrade.sh"
+mkdir -p "$VENDOR/templates"; cp "$SKEIN_HOME/templates/brief.md.tmpl" "$SKEIN_HOME/templates/review-prompt.md" "$VENDOR/templates/"
+chmod +x "$VENDOR/skein"
 node "$SKEIN_HOME/lib/render.mjs" "$SKEIN_HOME/templates/pre-push.tmpl" scripts/githooks/pre-push BASE="$(cfg .baseBranch main)" COORD_ENV="$COORD_ENV"; chmod +x scripts/githooks/pre-push
 log "vendored skein $old -> $new in $VENDOR/ (config, plan, briefs untouched)"

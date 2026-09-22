@@ -15,7 +15,7 @@ _ss_set_state() {  # <task-json> <state>
   local id labels
   id="$(jq -r '.id' <<<"$1")"
   labels="$(_ss_labels "$1" | tr ',' '\n' | grep -v '^state:' | grep -v '^$' | paste -sd, -)"
-  superset tasks update "$id" --labels "${labels:+$labels,}skein,state:$2" --json >/dev/null 2>&1 || true
+  superset tasks update "$id" --labels "${labels:+$labels,}skein,state:$2" --json >/dev/null 2>&1
 }
 
 board_claim() {
@@ -32,12 +32,15 @@ board_claim() {
   if [ -n "$owner" ] && [ "$owner" != "$me" ]; then die "$id is claimed by another member on the Superset board"; fi
   if _ss_labels "$t" | grep -q 'state:running' && [ "$owner" = "$me" ]; then die "$id is already running under your claim"; fi
   superset tasks update "$(jq -r .id <<<"$t")" --assignee "$me" --json >/dev/null 2>&1 || die "could not claim $id"
-  _ss_set_state "$t" running
+  _ss_set_state "$t" running || die "claimed $id but could not mark it running; fix the task's labels on the board"
+  # Verify exclusive ownership after the write (assignment is not atomic across coordinators).
+  t="$(_ss_task_for "$id")"; owner="$(jq -r '.assigneeId // .assignee.id // .assignee // empty' <<<"$t")"
+  [ "$owner" = "$me" ] || die "$id was claimed by another member at the same moment"
 }
-board_release() { local t; t="$(_ss_task_for "$1")"; [ -n "$t" ] && _ss_set_state "$t" "${2:-gating}"; return 0; }
+board_release() { local t; t="$(_ss_task_for "$1")"; [ -n "$t" ] && { _ss_set_state "$t" "${2:-gating}" || true; }; return 0; }
 board_close() {
   local t id; t="$(_ss_task_for "$1")"; [ -n "$t" ] || return 0; id="$(jq -r .id <<<"$t")"
-  _ss_set_state "$t" done
+  _ss_set_state "$t" done || true
   [ -n "${2:-}" ] && superset tasks update "$id" --pr-url "$2" --json >/dev/null 2>&1 || true
 }
 board_owner() { _ss_task_for "$1" | jq -r '.assigneeId // .assignee.id // .assignee // empty'; }

@@ -79,7 +79,8 @@ fi
 # --- vendor the runtime
 rm -rf "$VENDOR/lib" "$VENDOR/commands"; mkdir -p "$VENDOR"
 cp "$SKEIN_HOME/bin/skein" "$VENDOR/skein"; cp -r "$SKEIN_HOME/lib" "$SKEIN_HOME/commands" "$VENDOR/"; cp "$SKEIN_HOME/VERSION" "$VENDOR/VERSION"
-rm -f "$VENDOR/commands/init.sh" "$VENDOR/commands/upgrade.sh"   # need the kit's templates
+rm -f "$VENDOR/commands/init.sh" "$VENDOR/commands/upgrade.sh"   # need the kit's full templates
+mkdir -p "$VENDOR/templates"; cp "$SKEIN_HOME/templates/brief.md.tmpl" "$SKEIN_HOME/templates/review-prompt.md" "$VENDOR/templates/"   # brief --new and review render these
 chmod +x "$VENDOR/skein"
 log "vendored skein $(cat "$VENDOR/VERSION") into $VENDOR/"
 
@@ -94,7 +95,7 @@ render() {  # render <template> <dest>
     PLAN="docs/plan/wps.json" BRIEFS="docs/plan/briefs" VENDOR="$VENDOR" GATE="$GATE" INSTALL="$INSTALL" \
     STANDARD_LINES="${STANDARD_LINES:-# no standard commands detected: add typecheck/lint/test scripts}" \
     STANDARD_YAML="${STANDARD_YAML:-          echo no standard commands configured}" CI_SETUP="$CI_SETUP" \
-    LOCKFILE="${LOCKFILE:-package-lock.json}" BOARD="$BOARD" REPO="$REPO" ENV_FILES="$ENV_FILES" ENV_WITHHOLD="" PREPARE="$PREPARE" \
+    LOCKFILE="${LOCKFILE:-package-lock.json}" BOARD="$BOARD" REPO="$REPO" ENV_FILES="$ENV_FILES" ENV_COPY_REAL=0 ENV_WITHHOLD="" PREPARE="$PREPARE" \
     DEV_CMD="${DEV_CMD:-echo 'no dev command configured'}" DEV_PORT="$DEV_PORT" \
     PROJECT_RULES="" PROJECT_HYGIENE="" PROJECT_ONBOARDING=""
   log "wrote $dest"
