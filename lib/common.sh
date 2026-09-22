@@ -39,8 +39,8 @@ PLAN="$ROOT/$(cfg .plan docs/plan/wps.json)"
 BRIEFS="$ROOT/$(cfg .briefs docs/plan/briefs)"
 PREFIX="$(cfg .prefix TASK)"
 ENVELOPE="$(cfg .envelope "${PREFIX}_WORKER")"
-BOARD_TYPE="$(cfg .board.type github)"
-DRIVER_TYPE="$(cfg .driver.type superset)"
+BOARD_TYPE="${SKEIN_BOARD:-$(cfg .board.type github)}"
+DRIVER_TYPE="${SKEIN_DRIVER:-$(cfg .driver.type superset)}"   # SKEIN_DRIVER=local for a machine without Superset
 COORD_ENV="$(cfg .coordinatorEnv "${PREFIX}_COORDINATOR")"
 
 # Task helpers over the plan file.
