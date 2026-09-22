@@ -2,7 +2,7 @@
 # skein init [--name n] [--prefix P] [--board github|superset|none] [--driver superset|local]
 #            [--base main] [--force-templates]
 # Scaffold a repo for skein: .skein/config.json, the vendored scripts, AGENTS.md, docs/plan,
-# CI, hooks and Superset lifecycle scripts. Idempotent: existing files are kept unless
+# CI, hooks and Superset lifecycle scripts. Idempotent: existing files are left alone unless
 # --force-templates; the vendored scripts are always refreshed. Runs from the kit, not from
 # a vendored copy (it needs the templates).
 . "$SKEIN_HOME/lib/common.sh"
@@ -58,7 +58,7 @@ esac
 [ -n "$INSTALL" ] || INSTALL="true"
 ENV_FILES="$(ls -a .env .env.local 2>/dev/null | tr '\n' ' ')"; ENV_FILES="${ENV_FILES:-.env}"
 
-# --- config (kept if present)
+# --- config (left alone if present)
 mkdir -p .skein
 if [ -f .skein/config.json ] && [ -z "$FORCE" ]; then log "keeping existing .skein/config.json"
 else
@@ -83,7 +83,7 @@ rm -f "$VENDOR/commands/init.sh" "$VENDOR/commands/upgrade.sh"   # need the kit'
 chmod +x "$VENDOR/skein"
 log "vendored skein $(cat "$VENDOR/VERSION") into $VENDOR/"
 
-# --- templates (kept if present)
+# --- templates (left alone if present)
 STANDARD_LINES="$(printf '%s\n' "${STANDARD[@]:-}" | grep -v '^$' | paste -sd'\n' -)"
 STANDARD_YAML="$(printf '%s\n' "${STANDARD[@]:-}" | grep -v '^$' | sed 's/^/          /')"
 render() {  # render <template> <dest>

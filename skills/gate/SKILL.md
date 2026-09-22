@@ -1,6 +1,6 @@
 ---
 name: skein-gate
-description: Run the skein merge gate for a task and explain any failure with the fix. Use when asked to "gate KEPT-03", "run the gate", "why did the gate fail", or before merging.
+description: Run the skein merge gate for a task and explain any failure with the fix. Use when asked to "gate TASK-03", "run the gate", "why did the gate fail", or before merging.
 ---
 
 # /skein-gate

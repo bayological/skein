@@ -47,7 +47,7 @@ skein init                          # or the /skein-init skill, which also inter
 This writes `.skein/config.json`, vendors the runtime into `scripts/skein/`, and adds
 `AGENTS.md`, `docs/plan/` (runbook, coordinator prompt, onboarding, the plan), a CI
 workflow, a pre-push hook that refuses the base branch, and Superset lifecycle scripts.
-Existing files are kept. Fill in the project rules, commit, push.
+Existing files are left alone. Fill in the project rules, commit, push.
 
 Day to day nobody types these commands. You open a session in your checkout, paste
 `docs/plan/COORDINATOR-PROMPT.md`, and talk. The coordinator runs the commands.

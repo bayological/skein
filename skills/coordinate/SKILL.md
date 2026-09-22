@@ -1,6 +1,6 @@
 ---
 name: skein-coordinate
-description: Run a wave as the skein coordinator: check the machine, dispatch ready tasks under both caps, watch for envelopes, gate, review money/pii tasks, merge, and keep the plan true. Use when asked to "run the wave", "dispatch KEPT-01", "coordinate", "merge what's done", or when a session was started from docs/plan/COORDINATOR-PROMPT.md.
+description: Run a wave as the skein coordinator: check the machine, dispatch ready tasks under both caps, watch for envelopes, gate, review money/pii tasks, merge, and keep the plan true. Use when asked to "run the wave", "dispatch TASK-01", "coordinate", "merge what's done", or when a session was started from docs/plan/COORDINATOR-PROMPT.md.
 ---
 
 # /skein-coordinate
