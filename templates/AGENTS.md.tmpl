@@ -1,0 +1,107 @@
+# AGENTS.md
+
+Rules for every agent working in this repository. Coordinator-owned: do not edit.
+
+This repo is {{NAME}}. It is built by several agents in parallel, each in its own workspace
+and branch, and every claim is verified by a gate before it merges. The rules below exist so
+that parallel work merges cleanly and so that no mistake reaches production, a user, or a
+credential.
+
+## Read before you write
+1. Your brief: `{{BRIEFS}}/<task-id>.md`. It names the paths you own and how you will be
+   judged.
+2. `{{PLAN}}`: which task owns which paths, and what is coordinator-owned.
+3. The project rules below, and whatever the brief lists under "Read first".
+
+## The rules
+
+**1. Stay inside your paths.** Change only files matching your task's `owned` globs in
+`{{PLAN}}`. The `alwaysAllowed` entries there (lockfile, `docs/adr/DRAFT-*.md`) are always
+fine. Never edit anything under `coordinatorOwned`: `AGENTS.md`, `.skein/**`,
+`{{VENDOR}}/**`, `docs/plan/**`, `.github/**`, the hooks, and the project's frozen paths. If
+a shared file seems to need a change, that is a blocker to report, not an edit to make.
+
+**2. Frozen paths are frozen.** The plan's `coordinatorOwned` list names the contract this
+project builds against. If it lacks something you need, stop and report `BLOCKED` with the
+exact change you propose. The coordinator applies it with a short ADR and tells running
+workers to rebase.
+
+**3. Never weaken a test to get green.** No `.skip`, `.only` or `.todo`. No `@ts-nocheck`,
+no file-wide lint disables, no widened tolerances. Shared regression suites only grow; the
+gate counts them. A failing test is information: fix the code or report the problem.
+
+**4. Secrets.** Never commit `.env` or any credential. Never print, log, or put in an error
+message a key, a token, a signing secret, or a user's personal data. Test data is invented.
+The gate scans for committed keys; do not rely on it.
+
+**5. Dependencies.** Add one only if your brief's work needs it, and name it in your hand-off.
+Prefer what is already here. No install scripts from packages you cannot vouch for.
+
+**6. Stay in scope.** Do what the brief says. Note improvements you spot in your hand-off
+instead of making them. Do not refactor another task's code.
+
+**7. Skills and workflows.** The coordinator uses whatever skills it likes; workers do not.
+Do not invoke `/ship`, `/review`, `/qa`, or any workflow that merges, bumps versions, or opens
+PRs on your behalf. Your gate is `{{GATE}} <task-id>` and nothing else.
+
+**8. Do not poll GitHub.** Every agent shares API limits. No `gh pr checks --watch`, no loop
+around `gh`. The local gate is your evidence; the coordinator watches CI.
+
+## Project rules
+<!-- The coordinator fills this in at init: money, data, infrastructure, and the
+     invariants the gate enforces (see .skein/config.json "invariants"). -->
+{{PROJECT_RULES}}
+
+## Workflow
+1. Read the brief and everything it lists under "Read first".
+2. Work in small conventional commits (`feat(scope): …`, `fix(scope): …`, `test(scope): …`)
+   on your branch only.
+3. Before claiming done, run the gate and make it pass:
+   ```bash
+   {{GATE}} <task-id>
+   ```
+   It checks a clean tree, path ownership, committed secrets, test integrity, the project's
+   invariants, then the standard commands, the e2e suite if configured, and your task's
+   acceptance commands. The coordinator and CI run the same gate, so a claim it does not
+   support will be rejected.
+4. Push your branch and open a **draft** pull request. Names say what the work is and carry
+   the task id:
+   - **your branch** is `<type>/<slug>-<task-id>`, made for you at dispatch;
+   - **the pull request title** is a conventional-commit subject with the id at the end:
+     `fix(api): JSON 404 for unknown paths ({{PREFIX}}-01)`. It becomes the squashed commit on
+     `{{BASE}}`, and the plan reads it to know the task merged.
+
+   Never push to `{{BASE}}`, never merge, never force-push a branch that is not yours.
+5. End your final message with exactly one envelope.
+
+## Completion envelope
+```text
+{{ENVELOPE}}_DONE
+task: <task-id>
+summary: <one-line outcome>
+pr: <draft PR url>
+files: <comma-separated top-level paths, or none>
+checks: <the SKEIN_GATE_RESULT line, verbatim>
+handoff: <what the next task or the reviewer needs to know, or none>
+```
+```text
+{{ENVELOPE}}_BLOCKED
+task: <task-id>
+reason: <specific blocker>
+needs: <the decision, access, contract change or dependency required>
+```
+Report `BLOCKED` early rather than working around a problem. A precise blocker is a good
+outcome; a silent workaround is not.
+
+## Ambiguity
+If the architecture or the contract is ambiguous or wrong, do not guess silently. Write
+`docs/adr/DRAFT-<task-id>-<slug>.md` stating the context, the decision you took and its
+consequences, and mention it in your hand-off. The coordinator numbers it at merge.
+
+## Commands
+```bash
+{{INSTALL}}
+{{STANDARD_LINES}}
+{{GATE}} <task-id>
+{{GATE}} <task-id> --only boundary,secrets,test-integrity,invariants   # fast static checks
+```

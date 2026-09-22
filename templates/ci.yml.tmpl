@@ -1,0 +1,29 @@
+name: skein gate
+
+# The same gate the worker and the coordinator run, minus anything that needs secrets. The
+# coordinator looks at this once per PR; nobody polls it.
+on:
+  pull_request:
+  push:
+    branches: [{{BASE}}]
+
+concurrency:
+  group: skein-gate-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+{{CI_SETUP}}
+      - run: {{INSTALL}}
+      - name: task gate (pull request)
+        if: github.event_name == 'pull_request'
+        run: {{VENDOR}}/skein gate --from-branch --only brief,boundary,secrets,test-integrity,invariants,standard
+      - name: standard ({{BASE}})
+        if: github.event_name == 'push'
+        run: |
+{{STANDARD_YAML}}

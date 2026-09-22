@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Run button: start the dev server on a free port, so parallel workspaces never fight over
+# one. Override with PORT to pin one.
+set -euo pipefail
+FIRST_PORT="${FIRST_PORT:-{{DEV_PORT}}}"; LAST_PORT=$((FIRST_PORT + 9))
+port_free() { ! (exec 3<>"/dev/tcp/127.0.0.1/$1") 2>/dev/null; }
+PORT="${PORT:-}"
+if [ -z "$PORT" ]; then
+  PORT="$FIRST_PORT"
+  while [ "$PORT" -le "$LAST_PORT" ] && ! port_free "$PORT"; do PORT=$((PORT + 1)); done
+  [ "$PORT" -le "$LAST_PORT" ] || { echo "no free port in $FIRST_PORT-$LAST_PORT; set PORT" >&2; exit 1; }
+fi
+echo "{{NAME}} (${SUPERSET_WORKSPACE_NAME:-workspace}) -> http://localhost:$PORT"
+export PORT
+exec {{DEV_CMD}}

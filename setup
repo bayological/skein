@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# skein setup — register the skills with Claude Code and put `skein` on PATH.
+#   ./setup            install for Claude Code (~/.claude/skills/skein-*), link ~/.local/bin/skein
+#   ./setup --uninstall
+set -euo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
+SKILLS_DIR="${CLAUDE_SKILLS_DIR:-$HOME/.claude/skills}"
+BIN_DIR="${SKEIN_BIN_DIR:-$HOME/.local/bin}"
+if [ "${1:-}" = "--uninstall" ]; then
+  rm -f "$SKILLS_DIR"/skein-* "$BIN_DIR/skein"; echo "skein: skills and bin link removed"; exit 0
+fi
+mkdir -p "$SKILLS_DIR" "$BIN_DIR"
+for d in "$HERE"/skills/*/; do
+  n="$(basename "$d")"; ln -sfn "$d" "$SKILLS_DIR/skein-$n"; echo "skill: /skein-$n -> $d"
+done
+ln -sfn "$HERE/bin/skein" "$BIN_DIR/skein"; echo "bin: $BIN_DIR/skein -> $HERE/bin/skein"
+case ":$PATH:" in *":$BIN_DIR:"*) ;; *) echo "note: add $BIN_DIR to PATH (export PATH=\"$BIN_DIR:\$PATH\")";; esac
+for b in git node jq gh; do command -v "$b" >/dev/null || echo "note: '$b' not found; skein needs it"; done
+echo "skein $(cat "$HERE/VERSION") installed. In a repo: skein init, then restart Claude Code to load the skills."

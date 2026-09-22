@@ -1,0 +1,88 @@
+#!/usr/bin/env bash
+# Board: GitHub issues. One issue per task, titled "<ID>: <title>". Assigning yourself is
+# the claim; an unassigned issue is free. Labels carry the state so the board reads the
+# same in the GitHub UI and in `skein status`. Works for teammates who never open Superset.
+#
+# Interface (every board implements these):
+#   board_claim <ID> <title> <branch>   claim or fail; prints the issue url
+#   board_release <ID> <state>          drop the running state (gating|blocked|ready)
+#   board_close <ID> <pr-url>           close on merge
+#   board_owner <ID>                    login holding the claim, or empty
+#   board_running_count                 running claims across all coordinators
+#   board_list                          tsv: id  state  owner  url
+#   board_comment <ID> <text>
+
+need gh jq
+BOARD_REPO="$(cfg .board.repo "$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)")"
+[ -n "$BOARD_REPO" ] || die "board.repo not set and gh cannot see a repo here"
+
+_gh_labels_ready=""
+_ensure_labels() {
+  [ -n "$_gh_labels_ready" ] && return 0
+  for l in "skein:#5319e7" "state:ready:#0e8a16" "state:running:#1d76db" "state:gating:#fbca04" "state:blocked:#d93f0b"; do
+    gh label create "${l%%:#*}" --color "${l##*#}" -R "$BOARD_REPO" >/dev/null 2>&1 || true
+  done
+  _gh_labels_ready=1
+}
+
+_issue_for() {  # _issue_for <ID> -> json {number,url,assignees,labels} or empty
+  gh issue list -R "$BOARD_REPO" --state open --label skein --search "\"$1:\" in:title" --limit 20 \
+    --json number,title,url,assignees,labels 2>/dev/null \
+    | jq -c --arg id "$1" '[.[] | select(.title | ascii_downcase | startswith(($id|ascii_downcase) + ":"))] | .[0] // empty'
+}
+
+board_claim() {
+  local id="$1" title="$2" branch="$3" me issue num owner
+  me="$(me)"; _ensure_labels
+  issue="$(_issue_for "$id")"
+  if [ -z "$issue" ]; then
+    gh issue create -R "$BOARD_REPO" --title "$id: $title" --label skein --label state:running --assignee "$me" \
+      --body "Task \`$id\` in \`$(cfg .plan docs/plan/wps.json)\`. Branch \`$branch\`. Claimed by @$me via skein dispatch." 2>/dev/null \
+      || die "could not create the board issue for $id"
+    return 0
+  fi
+  num="$(jq -r .number <<<"$issue")"
+  owner="$(jq -r '.assignees[0].login // empty' <<<"$issue")"
+  if [ -n "$owner" ] && [ "$owner" != "$me" ]; then
+    die "$id is claimed by @$owner (issue #$num). An assigned issue is not yours to dispatch."
+  fi
+  if jq -e '.labels[] | select(.name=="state:running")' <<<"$issue" >/dev/null && [ "$owner" = "$me" ]; then
+    die "$id is already running under your claim (issue #$num). Watch it, or release it first."
+  fi
+  gh issue edit "$num" -R "$BOARD_REPO" --add-assignee "$me" --add-label state:running \
+    --remove-label state:ready --remove-label state:gating --remove-label state:blocked >/dev/null 2>&1 \
+    || die "could not claim issue #$num"
+  jq -r .url <<<"$issue"
+}
+
+board_release() {
+  local id="$1" state="${2:-gating}" issue num
+  issue="$(_issue_for "$id")"; [ -n "$issue" ] || return 0
+  num="$(jq -r .number <<<"$issue")"; _ensure_labels
+  gh issue edit "$num" -R "$BOARD_REPO" --remove-label state:running --remove-label state:gating \
+    --remove-label state:blocked --remove-label state:ready --add-label "state:$state" >/dev/null 2>&1 || true
+}
+
+board_close() {
+  local id="$1" pr="${2:-}" issue num
+  issue="$(_issue_for "$id")"; [ -n "$issue" ] || return 0
+  num="$(jq -r .number <<<"$issue")"
+  gh issue close "$num" -R "$BOARD_REPO" --comment "Merged${pr:+: $pr}. Closed by skein merge." >/dev/null 2>&1 || true
+}
+
+board_owner() { _issue_for "$1" | jq -r '.assignees[0].login // empty'; }
+
+board_running_count() {
+  gh issue list -R "$BOARD_REPO" --state open --label skein --label state:running --limit 200 --json number 2>/dev/null | jq 'length'
+}
+
+board_list() {
+  gh issue list -R "$BOARD_REPO" --state open --label skein --limit 200 --json title,url,assignees,labels 2>/dev/null \
+    | jq -r '.[] | [(.title|split(":")[0]), ((.labels[]?.name|select(startswith("state:"))|sub("state:";"")) // "none"), (.assignees[0].login // "-"), .url] | @tsv'
+}
+
+board_comment() {
+  local issue num; issue="$(_issue_for "$1")"; [ -n "$issue" ] || return 0
+  num="$(jq -r .number <<<"$issue")"
+  gh issue comment "$num" -R "$BOARD_REPO" --body "$2" >/dev/null 2>&1 || true
+}
