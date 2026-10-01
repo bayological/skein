@@ -19,7 +19,8 @@ copy_env() {
   if [ -f "$rel" ]; then echo "env: $rel already present"
   elif [ "$ENV_COPY_REAL" = 1 ] && [ -f "$ROOT/$rel" ]; then
     mkdir -p "$(dirname "$rel")"
-    if [ -n "$ENV_WITHHOLD" ]; then sed -E "s|^($ENV_WITHHOLD)=.*|\1=  # skein workspace: withheld|" "$ROOT/$rel" > "$rel"; else cp "$ROOT/$rel" "$rel"; fi
+    # `~` delimits the s command: ENV_WITHHOLD's own `|` alternations would end a s|…|…| early.
+    if [ -n "$ENV_WITHHOLD" ]; then sed -E "s~^($ENV_WITHHOLD)=.*~\1=  # skein workspace: withheld~" "$ROOT/$rel" > "$rel"; else cp "$ROOT/$rel" "$rel"; fi
     chmod 600 "$rel"; echo "env: copied $rel from main checkout${ENV_WITHHOLD:+ (withheld: $ENV_WITHHOLD)}"
   elif [ -f "$rel.example" ]; then cp "$rel.example" "$rel"; echo "env: $rel created from $rel.example"
   else echo "env: no $rel.example; skipping"; fi
