@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # skein merge <TASK> [--no-gate]
 # The coordinator's merge: rerun the gate in the worker's worktree, squash-merge the PR,
-# close the claim, delete the workspace, mark the task done in the plan and log it.
+# close the claim, delete the workspace (its teardown runs), then the task branch, and mark
+# the task done in the plan and log it.
 # Refuses a task claimed by someone else, never merges a money/pii task without the review
 # marker on its PR, and honours --no-gate only when the PR's CI gate check succeeded.
 . "$SKEIN_HOME/lib/common.sh"; require_config; load_board; load_driver
@@ -37,10 +38,18 @@ else
 fi
 
 gh pr ready "$PRNUM" >/dev/null 2>&1 || true
-gh pr merge "$PRNUM" --squash --delete-branch >/dev/null || die "merge failed for PR #$PRNUM"
+# No --delete-branch: gh deletes a local branch that a worktree has checked out by removing the
+# worktree first, so the driver would then find no lifecycle teardown to run and the worker's
+# database, containers and dev servers would outlive it. Delete the workspace, then the branch.
+gh pr merge "$PRNUM" --squash >/dev/null || die "merge failed for PR #$PRNUM"
 log "merged $PRURL"
 board_close "$ID" "$PRURL"
 [ -n "$WS" ] && driver_delete "$WS"
+# Already gone when the repo deletes head branches on merge; nothing to report then.
+env "$COORD_ENV=1" git -C "$ROOT" push -q origin --delete "$BRANCH" 2>/dev/null || true
+if git -C "$ROOT" show-ref --verify --quiet "refs/heads/$BRANCH"; then
+  git -C "$ROOT" branch -q -D "$BRANCH" || warn "could not delete local branch $BRANCH (is its worktree still there?)"
+fi
 
 # Record: done in the plan, a line in the log, pushed by the coordinator.
 ( cd "$ROOT" && git pull -q --rebase origin "$BASE" 2>/dev/null
