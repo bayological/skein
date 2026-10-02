@@ -21,7 +21,8 @@ PR="$(gh pr list --head "$BRANCH" --state open --json number,url -q '.[0]' 2>/de
 [ -n "$PR" ] || die "no open PR for branch $BRANCH"
 PRNUM="$(jq -r .number <<<"$PR")"; PRURL="$(jq -r .url <<<"$PR")"
 
-created="$(driver_create "review: ${SLUG:-$ID} ($ID)" "review-${SLUG:-$(tr '[:upper:]' '[:lower:]' <<<"$ID")}-$(date +%s)" "$BRANCH" review)" || exit 1
+RBRANCH="review-${SLUG:-$(tr '[:upper:]' '[:lower:]' <<<"$ID")}-$(date +%s)"
+created="$(driver_create "review: ${SLUG:-$ID} ($ID)" "$RBRANCH" "$BRANCH" review)" || exit 1
 WS="$(jq -r .ws <<<"$created")"; RPATH="$(driver_path "$WS")"
 driver_wait_setup "$WS" "$(jq -r .setup <<<"$created")" "$(cfg .setupTimeout 300)" || warn "review workspace setup did not finish cleanly; reviewing anyway"
 
@@ -50,4 +51,7 @@ grep -q "REVIEW_DONE" "$OUT" || warn "review output has no REVIEW_DONE envelope;
 gh pr comment "$PRNUM" --body-file "$OUT.comment" >/dev/null 2>&1 && log "posted review to $PRURL" || warn "could not post the PR comment; findings are in $OUT"
 board_release "$ID" gating
 driver_delete "$WS"
+# The review branch only gave the read-only worktree a checkout and holds no commits; the
+# driver removes the worktree but not the branch.
+git -C "$ROOT" branch -q -D "$RBRANCH" 2>/dev/null || true
 emit --arg task "$ID" --arg pr "$PRURL" --arg file "$OUT" --arg agent "$AGENT:$MODEL" '{task:$task, ok:true, pr:$pr, file:$file, reviewer:$agent}'
