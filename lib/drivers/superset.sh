@@ -16,10 +16,25 @@
 #   driver_find <ID>                        ws id whose name carries "(ID)"
 #   driver_list                             tsv: ws  name  path  tags
 #   driver_running_count                    workspaces tagged running for this repo here
+#
+# Host guard: workspaces are created with --local, but terminals/agents/ws-get address a
+# workspace by id alone, and Superset routes that to whichever host in the org owns it.
+# Every id-addressed call goes through _ss_guard first, so a wrong or stale id can never
+# type into a terminal on another machine.
 
 need superset jq
 READY_RE="$(cfg .readyMarker "workspace '.*' ready")"
 FATAL_RE="$(cfg .setupFatal "ERR_PNPM|ELIFECYCLE|npm ERR!|npm error|command not found|error TS[0-9]+")"
+
+_SS_LOCAL_OK=" "
+_ss_guard() {
+  local ws="$1"
+  [ -n "$ws" ] || die "no workspace id"
+  case "$_SS_LOCAL_OK" in *" $ws "*) return 0 ;; esac
+  superset ws list --local --json 2>/dev/null | jq -e --arg w "$ws" 'any(.[]; .id==$w)' >/dev/null \
+    || die "workspace $ws is not on this host: refusing to drive it from here"
+  _SS_LOCAL_OK="$_SS_LOCAL_OK$ws "
+}
 
 driver_project_id() {
   local id="${SKEIN_PROJECT_ID:-}"
@@ -46,6 +61,7 @@ driver_create() {
 driver_wait_setup() {
   local ws="$1" setup="$2" secs="${3:-300}" txt="" i
   [ -n "$setup" ] || return 0
+  _ss_guard "$ws"
   for ((i=0; i<secs; i+=3)); do
     txt="$(superset terminals read --workspace "$ws" --terminal "$setup" --max-lines 80 --json 2>/dev/null | jq -r '.text // ""')"
     grep -q -E "$READY_RE" <<<"$txt" && return 0
@@ -55,7 +71,7 @@ driver_wait_setup() {
   echo "setup did not print the readiness marker in ${secs}s" >&2; return 1
 }
 
-driver_path() { superset ws get "$1" --json 2>/dev/null | jq -r '.worktreePath // empty'; }
+driver_path() { _ss_guard "$1"; superset ws get "$1" --json 2>/dev/null | jq -r '.worktreePath // empty'; }
 
 # Interactive Claude Code asks whether to trust a folder it has not seen, and arrow keys do
 # not arrive through `terminals send`. Trust is per path in ~/.claude.json, so record the
@@ -71,6 +87,7 @@ _pretrust_claude() {
 
 driver_launch() {
   local ws="$1" agent="$2" model="$3" effort="$4" prompt="$5" a term t started="" attempt cmd
+  _ss_guard "$ws"
   [ "$agent" = "claude" ] && _pretrust_claude "$(driver_path "$ws")"
   local args=(--workspace "$ws" --agent "$agent" --json --prompt "$prompt")
   [ -n "$model" ] && [ "$model" != "-" ] && args+=(--model "$model")
@@ -104,8 +121,8 @@ driver_launch() {
   printf '%s' "$term"
 }
 
-driver_read() { superset terminals read --workspace "$1" --terminal "$2" --max-lines "${3:-240}" --json 2>/dev/null | jq -r '.text // ""'; }
-driver_send() { superset terminals send --workspace "$1" --terminal "$2" --text "$3" --json >/dev/null; }
+driver_read() { _ss_guard "$1"; superset terminals read --workspace "$1" --terminal "$2" --max-lines "${3:-240}" --json 2>/dev/null | jq -r '.text // ""'; }
+driver_send() { _ss_guard "$1"; superset terminals send --workspace "$1" --terminal "$2" --text "$3" --json >/dev/null; }
 driver_tag()  { superset ws update "$1" --local --tag "$2" --json >/dev/null 2>&1 || true; }
 driver_delete() { superset ws delete "$1" --local --json 2>&1 | jq -r '.warnings[]? // empty' >&2; return 0; }
 
@@ -119,6 +136,7 @@ driver_running_count() { driver_list | awk -F'\t' '$4 ~ /(^|,)running(,|$)/' | w
 
 # The agent's terminal in a workspace: the newest live one that is not a plain shell.
 driver_agent_terminal() {
+  _ss_guard "$1"
   superset terminals list --workspace "$1" --json 2>/dev/null \
     | jq -r '[.sessions[] | select((.exited|not) and ((.title // "")|test("^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:")|not))] | sort_by(.createdAt) | last | .terminalId // empty'
 }
