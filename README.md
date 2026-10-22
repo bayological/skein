@@ -63,6 +63,19 @@ skein review      cross-model review in a read-only worktree  (money/pii tasks)
 skein merge       gate again, squash-merge, close the claim, delete the workspace
 ```
 
+## Local mode
+
+For experiments that live on one machine: a repo with no `origin` remote (or `"mode": "local"`
+in `.skein/config.json`) runs without GitHub. `skein init` there sets `mode: local` and
+`board: none`, and skips the CI workflow. Workspaces fork from the local base branch, so
+commit briefs and the plan there before dispatching. Workers commit on their branch and stop:
+no push, no PR. `skein merge` reruns the gate in the worktree, squash-merges the branch into
+the base branch in your checkout as `<type>: <title> (<ID>)`, deletes the workspace and
+branch, and marks the plan done, all without pushing. `skein review` writes its findings to
+`docs/plan/reviews/<ID>.md`, which is the marker `skein merge` wants for money/pii tasks.
+`--no-gate` is refused (there is no CI). Push the whole repo by hand when you want it on
+GitHub; to leave local mode, add the remote and drop `"mode"`.
+
 ## Config
 
 `.skein/config.json` (repo, committed):
@@ -70,6 +83,7 @@ skein merge       gate again, squash-merge, close the claim, delete the workspac
 | key | what |
 |---|---|
 | `name`, `prefix` | project name; task ids are `<prefix>-NN` |
+| `mode` | `local` for a repo with no remote (see Local mode); absent otherwise |
 | `board` | `{type: github\|superset\|none, repo}` |
 | `driver` | `{type: superset\|local}` |
 | `maxAgents` | repo cap, counted across coordinators |

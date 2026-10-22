@@ -47,4 +47,5 @@ skein plan
 ```
 Show the user the brief and ask what you got wrong. When they confirm: commit the brief and
 the plan change, push the base branch (coordinator override), and say the task is ready to
-`skein dispatch`.
+`skein dispatch`. In local mode (`skein doctor` says so) there is no remote: committing on the
+base branch is enough, since workspaces fork from it.

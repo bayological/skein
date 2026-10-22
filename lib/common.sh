@@ -39,7 +39,14 @@ PLAN="$ROOT/$(cfg .plan docs/plan/wps.json)"
 BRIEFS="$ROOT/$(cfg .briefs docs/plan/briefs)"
 PREFIX="$(cfg .prefix TASK)"
 ENVELOPE="$(cfg .envelope "${PREFIX}_WORKER")"
-BOARD_TYPE="${SKEIN_BOARD:-$(cfg .board.type github)}"
+# Local mode: no origin remote, or "mode": "local" in the config. Nothing is pushed, there are
+# no pull requests, workspaces fork from the local base branch, and `skein merge` squash-merges
+# locally. For experiments that live on one machine and get pushed (if ever) by hand.
+LOCAL_MODE=""
+{ [ "$(cfg .mode)" = local ] || ! git -C "$ROOT" remote get-url origin >/dev/null 2>&1; } && LOCAL_MODE=1
+base_ref() { if [ -n "$LOCAL_MODE" ]; then printf '%s' "$1"; else printf 'origin/%s' "$1"; fi; }   # base_ref <branch>
+fetch_origin() { [ -n "$LOCAL_MODE" ] || git -C "${1:-$ROOT}" fetch -q origin 2>/dev/null; return 0; }
+BOARD_TYPE="${SKEIN_BOARD:-$(cfg .board.type "$([ -n "$LOCAL_MODE" ] && echo none || echo github)")}"
 DRIVER_TYPE="${SKEIN_DRIVER:-$(cfg .driver.type superset)}"   # SKEIN_DRIVER=local for a machine without Superset
 COORD_ENV="$(cfg .coordinatorEnv "${PREFIX}_COORDINATOR")"
 

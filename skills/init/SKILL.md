@@ -56,5 +56,5 @@ skein doctor && skein plan
 git add -A && git commit -m "chore: skein setup (gate, plan, worker rules)"
 ```
 Push (with `<PREFIX>_COORDINATOR=1` if the hook is active) or open a PR, whichever the
-repo's rules say. Report in a few lines: what was detected, what the interview added, what
+repo's rules say. A repo with no origin is set up in local mode: the commit is the end of it. Report in a few lines: what was detected, what the interview added, what
 the first task is.

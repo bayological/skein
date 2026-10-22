@@ -31,7 +31,7 @@ while IFS=$'\t' read -r ws name path tags; do
   fi
   commits="-"; dirty="-"
   if [ -n "$path" ] && [ -d "$path" ]; then
-    commits="$(git -C "$path" rev-list --count "origin/$(cfg .baseBranch main)..HEAD" 2>/dev/null || echo '?')"
+    commits="$(git -C "$path" rev-list --count "$(base_ref "$(cfg .baseBranch main)")..HEAD" 2>/dev/null || echo '?')"
     dirty="$(git -C "$path" status --porcelain 2>/dev/null | wc -l | tr -d ' ')"
   fi
   printf '  %s%-40s%s %s  %s%s%s\n' "$B" "$name" "$R" "$state" "$D" "${tags:+[$tags]}" "$R"

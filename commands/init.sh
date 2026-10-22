@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # skein init [--name n] [--prefix P] [--board github|superset|none] [--driver superset|local]
 #            [--base main] [--force-templates]
+# With no origin remote the repo is set up in local mode (board none, "mode": "local"): no
+# pushes, no PRs, `skein merge` squash-merges locally. Add a remote and drop "mode" to leave it.
 # Scaffold a repo for skein: .skein/config.json, the vendored scripts, AGENTS.md, docs/plan,
 # CI, hooks and Superset lifecycle scripts. Idempotent: existing files are left alone unless
 # --force-templates; the vendored scripts are always refreshed. Runs from the kit, not from
@@ -9,12 +11,15 @@
 need git jq node
 [ -d "$SKEIN_HOME/templates" ] || die "init needs the kit's templates; run ~/.claude/skills/skein/bin/skein init"
 
-NAME=""; PREFIX=""; BOARD=github; DRIVER=superset; BASE=""; FORCE=""
+NAME=""; PREFIX=""; BOARD=""; DRIVER=superset; BASE=""; FORCE=""
 while [ $# -gt 0 ]; do case "$1" in
   --name) NAME="$2"; shift 2 ;; --prefix) PREFIX="$2"; shift 2 ;; --board) BOARD="$2"; shift 2 ;;
   --driver) DRIVER="$2"; shift 2 ;; --base) BASE="$2"; shift 2 ;; --force-templates) FORCE=1; shift ;;
   *) die "unknown flag $1" ;; esac; done
 cd "$ROOT"
+[ -n "$BOARD" ] || BOARD="$([ -n "$LOCAL_MODE" ] && echo none || echo github)"
+MODE="$([ -n "$LOCAL_MODE" ] && echo local)"
+[ -n "$LOCAL_MODE" ] && [ "$BOARD" = github ] && die "--board github needs an origin remote; this repo has none (local mode): use --board none or superset"
 [ -n "$NAME" ] || NAME="$(basename "$ROOT")"
 [ -n "$PREFIX" ] || PREFIX="$(tr '[:lower:]' '[:upper:]' <<<"${NAME%%-*}" | tr -cd 'A-Z0-9' | cut -c1-6)"
 [ -n "$BASE" ] || BASE="$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|origin/||')"; BASE="${BASE:-main}"
@@ -64,7 +69,7 @@ if [ -f .skein/config.json ] && [ -z "$FORCE" ]; then log "keeping existing .ske
 else
   jq -n --arg name "$NAME" --arg prefix "$PREFIX" --arg board "$BOARD" --arg repo "$REPO" --arg driver "$DRIVER" \
         --arg base "$BASE" --arg install "$INSTALL" --argjson standard "$(printf '%s\n' "${STANDARD[@]:-}" | grep -v '^$' | jq -R . | jq -s .)" \
-        --arg gate "$GATE" --arg vendor "$VENDOR" --arg coord "$COORD_ENV" --arg envelope "$ENVELOPE" '{
+        --arg gate "$GATE" --arg vendor "$VENDOR" --arg coord "$COORD_ENV" --arg envelope "$ENVELOPE" --arg mode "$MODE" '({
     version: 1, name: $name, prefix: $prefix, envelope: $envelope, coordinatorEnv: $coord,
     plan: "docs/plan/wps.json", briefs: "docs/plan/briefs", vendor: $vendor, gate: $gate, baseBranch: $base,
     board: {type: $board, repo: $repo}, driver: {type: $driver}, maxAgents: 6,
@@ -72,8 +77,8 @@ else
     worker: {agent: "claude", model: "claude-opus-5", effort: "high"},
     review: {agent: "codex", model: "gpt-6-astra", fallbackModel: "claude-fable-5-1"},
     readyMarker: "workspace '"'"'.*'"'"' ready", setupScript: ".superset/setup.sh", setupTimeout: 300
-  }' > .skein/config.json
-  log "wrote .skein/config.json (pm=${PM:-none}, standard=${#STANDARD[@]} cmds, board=$BOARD, driver=$DRIVER)"
+  } + (if $mode == "" then {} else {mode: $mode} end))' > .skein/config.json
+  log "wrote .skein/config.json (pm=${PM:-none}, standard=${#STANDARD[@]} cmds, board=$BOARD, driver=$DRIVER${MODE:+, mode=$MODE})"
 fi
 
 # --- vendor the runtime
@@ -87,6 +92,11 @@ log "vendored skein $(cat "$VENDOR/VERSION") into $VENDOR/"
 # --- templates (left alone if present)
 STANDARD_LINES="$(printf '%s\n' "${STANDARD[@]:-}" | grep -v '^$' | paste -sd'\n' -)"
 STANDARD_YAML="$(printf '%s\n' "${STANDARD[@]:-}" | grep -v '^$' | sed 's/^/          /')"
+# Mode-dependent pieces of AGENTS.md and COORDINATOR.md, rendered first (they carry placeholders).
+frag() { node "$SKEIN_HOME/lib/render.mjs" "$SKEIN_HOME/templates/fragments/$1" /dev/stdout BASE="$BASE" PREFIX="$PREFIX"; }
+if [ -n "$LOCAL_MODE" ]; then
+  SHIP_STEP="$(frag ship-local.md)"; ENVELOPE_PR="branch: <your branch, committed, not pushed>"; MODE_NOTE=$'\n'"$(frag coordinator-local.md)"$'\n'
+else SHIP_STEP="$(frag ship-github.md)"; ENVELOPE_PR="pr: <draft PR url>"; MODE_NOTE=""; fi
 render() {  # render <template> <dest>
   local tpl="$1" dest="$2"
   if [ -e "$dest" ] && [ -z "$FORCE" ] && [ "${3:-}" != always ]; then log "keeping $dest"; return 0; fi
@@ -97,7 +107,8 @@ render() {  # render <template> <dest>
     STANDARD_YAML="${STANDARD_YAML:-          echo no standard commands configured}" CI_SETUP="$CI_SETUP" \
     LOCKFILE="${LOCKFILE:-package-lock.json}" BOARD="$BOARD" REPO="$REPO" ENV_FILES="$ENV_FILES" ENV_COPY_REAL=0 ENV_WITHHOLD="" PREPARE="$PREPARE" \
     DEV_CMD="${DEV_CMD:-echo 'no dev command configured'}" DEV_PORT="$DEV_PORT" \
-    PROJECT_RULES="" PROJECT_HYGIENE="" PROJECT_ONBOARDING=""
+    PROJECT_RULES="" PROJECT_HYGIENE="" PROJECT_ONBOARDING="" \
+    SHIP_STEP="$SHIP_STEP" ENVELOPE_PR="$ENVELOPE_PR" MODE_NOTE="$MODE_NOTE"
   log "wrote $dest"
 }
 render AGENTS.md.tmpl AGENTS.md
@@ -107,7 +118,8 @@ render ONBOARDING.md.tmpl docs/plan/ONBOARDING.md
 render wps.json.tmpl docs/plan/wps.json
 mkdir -p docs/plan/briefs docs/adr; touch docs/plan/briefs/.gitkeep
 [ -f docs/adr/README.md ] || cp "$SKEIN_HOME/templates/adr-README.md" docs/adr/README.md
-render ci.yml.tmpl .github/workflows/skein-gate.yml
+if [ -n "$LOCAL_MODE" ]; then log "local mode: no CI workflow (nothing to run it); the gate runs locally"
+else render ci.yml.tmpl .github/workflows/skein-gate.yml; fi
 render pre-push.tmpl scripts/githooks/pre-push always; chmod +x scripts/githooks/pre-push
 [ -f .superset/config.json ] || { mkdir -p .superset; cp "$SKEIN_HOME/templates/superset/config.json" .superset/config.json; log "wrote .superset/config.json"; }
 render superset/setup.sh.tmpl .superset/setup.sh; chmod +x .superset/setup.sh
@@ -122,12 +134,12 @@ git config core.hooksPath scripts/githooks
 
 cat <<NEXT
 
-skein init done for $NAME ($PREFIX-xx tasks, board=$BOARD, driver=$DRIVER, base=$BASE).
+skein init done for $NAME ($PREFIX-xx tasks, board=$BOARD, driver=$DRIVER, base=$BASE${MODE:+, mode=$MODE}).
 
 Next:
   1. Fill "## Project rules" in AGENTS.md (money, data, infrastructure) and the invariants
      in .skein/config.json. The /skein-init skill can interview you for these.
   2. Check .skein/config.json "standard" commands and add "e2e" if the repo has a heavier suite.
   3. Add the first task to docs/plan/wps.json and write its brief (/skein-brief).
-  4. Commit, push $BASE, then: skein doctor && skein plan.
+  4. Commit$([ -n "$LOCAL_MODE" ] && echo " on $BASE (local mode: no push)" || echo ", push $BASE"), then: skein doctor && skein plan.
 NEXT

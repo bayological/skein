@@ -20,11 +20,11 @@ driver_create() {
   mkdir -p "$WT_ROOT" "$RUN_ROOT"
   path="$WT_ROOT/${branch//\//__}"
   [ -e "$path" ] && die "workspace already exists at $path"
-  git -C "$ROOT" fetch -q origin 2>/dev/null
+  fetch_origin
   if git -C "$ROOT" show-ref --verify --quiet "refs/heads/$branch"; then
     git -C "$ROOT" worktree add -q "$path" "$branch" || die "git worktree add failed"
   else
-    git -C "$ROOT" worktree add -q -b "$branch" "$path" "origin/$base" || die "git worktree add failed (is origin/$base fetched?)"
+    git -C "$ROOT" worktree add -q -b "$branch" "$path" "$(base_ref "$base")" || die "git worktree add failed (is $(base_ref "$base") there?)"
   fi
   # Driver state lives OUTSIDE the worktree: anything inside shows as untracked, and a
   # worker chasing a clean tree for the gate will delete it (seen on the first run).

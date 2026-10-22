@@ -29,19 +29,21 @@ fail() {
   emit --arg task "$ID" --arg error "$1" '{task:$task, ok:false, error:$error}'; exit 1
 }
 
-# 1. Dispatchable: brief valid, deps merged, and both on origin (workspaces fork from origin).
+# 1. Dispatchable: brief valid, deps merged, and both on origin (workspaces fork from origin;
+#    in local mode, from the local base branch, so both must be committed there).
 node "$SKEIN_HOME/lib/plan.mjs" --check "$ID" >/dev/null 2>&1 || fail "$(node "$SKEIN_HOME/lib/plan.mjs" --check "$ID" 2>&1 | tr '\n' ' ')"
 node "$SKEIN_HOME/lib/plan.mjs" --dispatchable | grep -qx "$ID" || fail "$ID is not dispatchable: a dependency is not merged (see skein plan)"
-git -C "$ROOT" fetch -q origin 2>/dev/null
-git -C "$ROOT" diff --quiet "origin/$BASE" -- "$(task_field "$t" brief)" "$PLAN" 2>/dev/null \
-  || fail "brief or plan differs from origin/$BASE: push $BASE first (workspaces fork from origin)"
+BASE_REF="$(base_ref "$BASE")"; fetch_origin
+SYNC_HINT="push $BASE first (workspaces fork from origin)"; [ -n "$LOCAL_MODE" ] && SYNC_HINT="commit them on $BASE first (workspaces fork from it)"
+git -C "$ROOT" diff --quiet "$BASE_REF" -- "$(task_field "$t" brief)" "$PLAN" 2>/dev/null \
+  || fail "brief or plan differs from $BASE_REF: $SYNC_HINT"
 
 # 2. A leftover branch from an earlier dispatch: harmless if it has no commits of its own
 #    (delete it so the workspace forks from today's origin), a stop if it has work on it.
-git -C "$ROOT" fetch -q origin 2>/dev/null
+fetch_origin
 for ref in "refs/heads/$BRANCH" "refs/remotes/origin/$BRANCH"; do
   git -C "$ROOT" show-ref --verify --quiet "$ref" || continue
-  if git -C "$ROOT" merge-base --is-ancestor "$ref" "origin/$BASE"; then
+  if git -C "$ROOT" merge-base --is-ancestor "$ref" "$BASE_REF"; then
     case "$ref" in
       refs/heads/*) git -C "$ROOT" branch -q -D "$BRANCH" && log "deleted stale local branch $BRANCH (no commits of its own)" ;;
       *) env "$COORD_ENV=1" git -C "$ROOT" push -q origin --delete "$BRANCH" 2>/dev/null && log "deleted stale remote branch $BRANCH (no commits of its own)" ;;
@@ -65,16 +67,18 @@ created="$(driver_create "$WS_NAME" "$BRANCH" "$BASE" "$TAG")" || fail "workspac
 WS="$(jq -r .ws <<<"$created")"; SETUP="$(jq -r .setup <<<"$created")"
 driver_wait_setup "$WS" "$SETUP" "$(cfg .setupTimeout 300)" || fail "setup failed in workspace $WS (see its setup output)"
 PATH_WS="$(driver_path "$WS")"; [ -d "$PATH_WS" ] || fail "cannot find the worktree for $WS_NAME"
-[ -f "$PATH_WS/$(task_field "$t" brief)" ] || fail "brief missing in the worktree (is it on origin/$BASE?)"
-git -C "$PATH_WS" fetch -q origin 2>/dev/null
-HEAD="$(git -C "$PATH_WS" rev-parse --short HEAD)"; MAIN="$(git -C "$PATH_WS" rev-parse --short "origin/$BASE")"
-[ "$HEAD" = "$MAIN" ] || fail "workspace HEAD $HEAD is not origin/$BASE $MAIN"
+[ -f "$PATH_WS/$(task_field "$t" brief)" ] || fail "brief missing in the worktree (is it on $BASE_REF?)"
+fetch_origin "$PATH_WS"
+HEAD="$(git -C "$PATH_WS" rev-parse --short HEAD)"; MAIN="$(git -C "$PATH_WS" rev-parse --short "$BASE_REF")"
+[ "$HEAD" = "$MAIN" ] || fail "workspace HEAD $HEAD is not $BASE_REF $MAIN"
 
 # 5. The worker prompt: fixed, bounded, and the same for every task.
 PROMPT="$(cfg .workerPrompt)"
 [ -n "$PROMPT" ] || PROMPT="You are worker {ID} in a multi-agent build of {NAME}. Read AGENTS.md, then {BRIEF}, and follow the brief exactly. Work only in this workspace and on this branch. Your gate is \`{GATE} {ID}\`; do not use any other workflow or skill to test, review or ship. When the gate passes, push the branch, open a draft pull request, and end your final message with the completion envelope described in AGENTS.md. Never merge a pull request."
+# Local mode: no remote to push to and no PR to open; the coordinator merges the branch.
+[ -n "$LOCAL_MODE" ] && [ -z "$(cfg .workerPrompt)" ] && PROMPT="You are worker {ID} in a multi-agent build of {NAME}. Read AGENTS.md, then {BRIEF}, and follow the brief exactly. Work only in this workspace and on this branch. Your gate is \`{GATE} {ID}\`; do not use any other workflow or skill to test, review or ship. This repo has no remote: when the gate passes, leave everything committed on this branch (do not push, do not open a pull request), and end your final message with the completion envelope described in AGENTS.md. Never merge into {BASE}."
 PROMPT="${PROMPT//\{ID\}/$ID}"; PROMPT="${PROMPT//\{NAME\}/$(cfg .name "$(basename "$ROOT")")}"
-PROMPT="${PROMPT//\{BRIEF\}/$(task_field "$t" brief)}"; PROMPT="${PROMPT//\{GATE\}/$GATE}"
+PROMPT="${PROMPT//\{BRIEF\}/$(task_field "$t" brief)}"; PROMPT="${PROMPT//\{GATE\}/$GATE}"; PROMPT="${PROMPT//\{BASE\}/$BASE}"
 
 TERM_ID="$(driver_launch "$WS" "$AGENT" "$MODEL" "$EFFORT" "$PROMPT")" || fail "the agent did not start"
 board_comment "$ID" "Dispatched by $(me): workspace \`$WS_NAME\`, branch \`$BRANCH\`, agent $AGENT${MODEL:+ ($MODEL)}, head $HEAD."

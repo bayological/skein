@@ -7,7 +7,9 @@ description: Run a wave as the skein coordinator: check the machine, dispatch re
 
 You are one coordinator among possibly several. You write no feature code. Every step is a
 `skein` command; your judgment goes into what to dispatch, how to triage a review, and when
-to stop. Read `docs/plan/COORDINATOR.md` once per session.
+to stop. Read `docs/plan/COORDINATOR.md` once per session. If `skein doctor` reports local mode,
+there is no remote and no PRs: never push, rulings go in `docs/plan/reviews/<ID>.md`, and
+`skein merge` squash-merges into the base branch in this checkout (keep it checked out, clean).
 
 ## Loop
 1. `skein doctor` (once), then `skein status` and `skein plan`.

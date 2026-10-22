@@ -3,8 +3,10 @@
 # Cross-model review of the task's PR in a read-only worktree forked from the PR branch,
 # headless. Posts the findings as one PR comment and prints the file. Mandatory for tasks
 # marked money or pii; the coordinator triages each finding on its merits.
+# Local mode (no origin): reviews the task branch's diff against the base branch and writes
+# the findings, with the marker `skein merge` looks for, to docs/plan/reviews/<ID>.md.
 . "$SKEIN_HOME/lib/common.sh"; require_config; load_board; load_driver
-need gh jq
+need jq; [ -n "$LOCAL_MODE" ] || need gh
 TASK=""; AGENT=""; MODEL=""
 while [ $# -gt 0 ]; do case "$1" in
   --agent) AGENT="$2"; shift 2 ;; --model) MODEL="$2"; shift 2 ;; -*) die "unknown flag $1" ;; *) TASK="$1"; shift ;; esac; done
@@ -17,9 +19,14 @@ if [ "$AGENT" = codex ] && ! codex --version >/dev/null 2>&1; then
   warn "codex not usable; falling back to claude"; AGENT=claude; MODEL="$(cfg .review.fallbackModel claude-fable-5-1)"
 fi
 
-PR="$(gh pr list --head "$BRANCH" --state open --json number,url -q '.[0]' 2>/dev/null)"
-[ -n "$PR" ] || die "no open PR for branch $BRANCH"
-PRNUM="$(jq -r .number <<<"$PR")"; PRURL="$(jq -r .url <<<"$PR")"
+if [ -n "$LOCAL_MODE" ]; then
+  git -C "$ROOT" show-ref --verify --quiet "refs/heads/$BRANCH" || die "no local branch $BRANCH"
+  PRNUM=""; PRURL="branch $BRANCH"
+else
+  PR="$(gh pr list --head "$BRANCH" --state open --json number,url -q '.[0]' 2>/dev/null)"
+  [ -n "$PR" ] || die "no open PR for branch $BRANCH"
+  PRNUM="$(jq -r .number <<<"$PR")"; PRURL="$(jq -r .url <<<"$PR")"
+fi
 
 RBRANCH="review-${SLUG:-$(tr '[:upper:]' '[:lower:]' <<<"$ID")}-$(date +%s)"
 created="$(driver_create "review: ${SLUG:-$ID} ($ID)" "$RBRANCH" "$BRANCH" review)" || exit 1
@@ -27,8 +34,8 @@ WS="$(jq -r .ws <<<"$created")"; RPATH="$(driver_path "$WS")"
 driver_wait_setup "$WS" "$(jq -r .setup <<<"$created")" "$(cfg .setupTimeout 300)" || warn "review workspace setup did not finish cleanly; reviewing anyway"
 
 OUT="${TMPDIR:-/tmp}/skein-review-$ID-$(date +%s).md"
-PROMPT="$(node "$SKEIN_HOME/lib/render.mjs" "$SKEIN_HOME/templates/review-prompt.md" /dev/stdout ID="$ID" PR="$PRURL" BRIEF="$(task_field "$t" brief)" BASE="origin/$(cfg .baseBranch main)" MONEY="$(task_field "$t" money)")"
-log "reviewing $ID (PR #$PRNUM) with $AGENT${MODEL:+ $MODEL} in $RPATH"
+PROMPT="$(node "$SKEIN_HOME/lib/render.mjs" "$SKEIN_HOME/templates/review-prompt.md" /dev/stdout ID="$ID" PR="$PRURL" BRIEF="$(task_field "$t" brief)" BASE="$(base_ref "$(cfg .baseBranch main)")" MONEY="$(task_field "$t" money)")"
+log "reviewing $ID ($([ -n "$PRNUM" ] && echo "PR #$PRNUM" || echo "$PRURL")) with $AGENT${MODEL:+ $MODEL} in $RPATH"
 # The reviewer reads; it never writes, runs the build, or reaches the network on its own.
 # codex: its read-only sandbox. claude: only read tools and git diff/log/show are allowed;
 # anything else is denied in headless mode.
@@ -48,7 +55,12 @@ esac
 grep -q "REVIEW_DONE" "$OUT" || warn "review output has no REVIEW_DONE envelope; read $OUT before trusting it"
 # The marker is what `skein merge` requires for money/pii tasks: a word in a comment is not evidence.
 { printf '<!-- skein-review task=%s reviewer=%s by=%s -->\n' "$ID" "$AGENT${MODEL:+:$MODEL}" "$(me)"; cat "$OUT"; } > "$OUT.comment"
-gh pr comment "$PRNUM" --body-file "$OUT.comment" >/dev/null 2>&1 && log "posted review to $PRURL" || warn "could not post the PR comment; findings are in $OUT"
+if [ -n "$LOCAL_MODE" ]; then
+  RFILE="$ROOT/$(cfg .reviews docs/plan/reviews)/$ID.md"; mkdir -p "$(dirname "$RFILE")"
+  cp "$OUT.comment" "$RFILE" && log "wrote review to $RFILE (commit it with the plan)" && OUT="$RFILE"
+else
+  gh pr comment "$PRNUM" --body-file "$OUT.comment" >/dev/null 2>&1 && log "posted review to $PRURL" || warn "could not post the PR comment; findings are in $OUT"
+fi
 board_release "$ID" gating
 driver_delete "$WS"
 # The review branch only gave the read-only worktree a checkout and holds no commits; the
