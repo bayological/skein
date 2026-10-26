@@ -9,7 +9,7 @@ need git jq node
 TASK=""; TAG=running; MODEL="-"; AGENT=""; EFFORT=""
 while [ $# -gt 0 ]; do case "$1" in
   --tag) TAG="$2"; shift 2 ;; --model) MODEL="$2"; shift 2 ;; --agent) AGENT="$2"; shift 2 ;; --effort) EFFORT="$2"; shift 2 ;;
-  -*) die "unknown flag $1" ;; *) TASK="$1"; shift ;; esac; done
+  -*) die "unknown flag $1" ;; *) [ -z "$TASK" ] || die "one task per call: got $TASK and $1"; TASK="$1"; shift ;; esac; done
 [ -n "$TASK" ] || die "usage: skein dispatch <TASK> [--tag t] [--model m] [--agent a] [--effort e]"
 
 t="$(task_json "$TASK")"; ID="$(jq -r .id <<<"$t")"; TITLE="$(task_field "$t" title)"
