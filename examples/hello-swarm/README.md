@@ -44,10 +44,13 @@ git add -A && git commit -qm "example: hello-swarm"
 Now scaffold the parts the example does not ship. `skein init` keeps the config and the plan
 that are already here, and adds the vendored runtime under `scripts/skein/`, `AGENTS.md`, the
 coordinator notes in `docs/plan/` (`COORDINATOR.md` and `COORDINATOR-PROMPT.md`), the pre-push
-hook and the workspace lifecycle scripts. Local mode writes no CI workflow.
+hook and the workspace lifecycle scripts. Local mode writes no CI workflow. Without `--name`
+and `--prefix`, init takes both from the directory name, and the name `mktemp` gave the sandbox
+is random, so the `AGENTS.md` it renders would name a different completion envelope from the
+`HS` prefix in the config.
 
 ```bash
-skein init
+skein init --name hello-swarm --prefix HS
 git add -A && git commit -qm "chore: skein init"
 skein plan
 ```
