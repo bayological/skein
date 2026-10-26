@@ -183,4 +183,8 @@ reports ownership overlaps among ready tasks, and nothing refuses a dispatch of 
 overlap; the gate's default base is `origin/main`, or `main`, whatever `baseBranch` says.
 [docs/limitations.md](docs/limitations.md) has the rest, each line traced to the fact sheet.
 
+This README, both diagrams, the example and the demo were built by a skein swarm working on
+skein itself. [docs/swarm-run.md](docs/swarm-run.md) logs the run, fix rounds and mistakes
+included.
+
 MIT.
