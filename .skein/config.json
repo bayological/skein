@@ -83,6 +83,30 @@
     {
       "file": "tests/sandbox.test.mjs",
       "pattern": "\\btest\\("
+    },
+    {
+      "file": "tests/base-branch.test.mjs",
+      "pattern": "\\btest\\("
+    },
+    {
+      "file": "tests/config-version.test.mjs",
+      "pattern": "\\btest\\("
+    },
+    {
+      "file": "tests/init.test.mjs",
+      "pattern": "\\btest\\("
+    },
+    {
+      "file": "tests/one-task.test.mjs",
+      "pattern": "\\btest\\("
+    },
+    {
+      "file": "tests/overlap.test.mjs",
+      "pattern": "\\btest\\("
+    },
+    {
+      "file": "tests/status.test.mjs",
+      "pattern": "\\btest\\("
     }
   ],
   "secretPatterns": [],
