@@ -1,0 +1,110 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="584" viewBox="0 0 800 584" role="img" aria-labelledby="t d" font-family="ui-sans-serif, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" fill="#768390">
+  <title id="t">skein architecture</title>
+  <desc id="d">A coordinator in the repository checkout reads the plan and claims a task on the board. skein dispatch goes through the driver into three parallel workers, each in its own worktree and branch. Every worker runs the same gate, which the coordinator and CI also run. A cross-model review follows for money and pii tasks only, then skein merge squashes to the base branch.</desc>
+
+  <text x="16" y="30" font-size="16" font-weight="600">skein: many agents in parallel, one gate</text>
+  <text x="16" y="52" font-size="13">Each task runs in its own workspace on its own branch, and one gate decides what merges.</text>
+
+  <g fill="none" stroke="#768390" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+    <rect x="16" y="74" width="172" height="136" rx="6" stroke-dasharray="4 3"/>
+    <rect x="28" y="108" width="148" height="36" rx="5"/>
+    <rect x="28" y="152" width="148" height="36" rx="5"/>
+    <rect x="16" y="234" width="172" height="94" rx="6"/>
+    <rect x="16" y="352" width="172" height="94" rx="6"/>
+    <rect x="208" y="232" width="160" height="64" rx="6"/>
+    <rect x="208" y="326" width="160" height="82" rx="6"/>
+    <rect x="384" y="80" width="196" height="84" rx="6"/>
+    <rect x="384" y="192" width="196" height="84" rx="6"/>
+    <rect x="384" y="304" width="196" height="84" rx="6"/>
+    <rect x="600" y="300" width="184" height="76" rx="6"/>
+    <rect x="600" y="404" width="184" height="76" rx="6"/>
+    <rect x="600" y="508" width="184" height="58" rx="6"/>
+
+    <rect x="600" y="196" width="184" height="76" rx="6" stroke-width="2.5"/>
+
+    <path d="M188 142 H199 V264"/>
+    <path d="M188 281 H199"/>
+    <path d="M188 399 H199 V264"/>
+    <path d="M199 264 H208"/>
+    <path d="M202 259 L208 264 L202 269"/>
+
+    <path d="M288 296 V326"/>
+    <path d="M283 320 L288 326 L293 320"/>
+
+    <path d="M368 367 H376 V122"/>
+    <path d="M376 122 H384"/>
+    <path d="M378 117 L384 122 L378 127"/>
+    <path d="M376 234 H384"/>
+    <path d="M378 229 L384 234 L378 239"/>
+    <path d="M376 346 H384"/>
+    <path d="M378 341 L384 346 L378 351"/>
+
+    <path d="M580 122 H590 V234"/>
+    <path d="M580 346 H590 V234"/>
+    <path d="M580 234 H590"/>
+    <path d="M590 234 H600"/>
+    <path d="M594 229 L600 234 L594 239"/>
+
+    <path d="M692 272 V300"/>
+    <path d="M687 294 L692 300 L697 294"/>
+    <path d="M692 376 V404"/>
+    <path d="M687 398 L692 404 L697 398"/>
+    <path d="M692 480 V508"/>
+    <path d="M687 502 L692 508 L697 502"/>
+  </g>
+
+  <text x="28" y="98" font-size="16">your checkout</text>
+  <text x="40" y="131" font-size="14">coordinator</text>
+  <text x="40" y="175" font-size="14">coordinator</text>
+  <text x="28" y="202" font-size="13">any number</text>
+
+  <text x="28" y="258" font-size="16">board</text>
+  <text x="28" y="280" font-size="14">GitHub issues,</text>
+  <text x="28" y="300" font-size="14">Superset tasks,</text>
+  <text x="28" y="320" font-size="14">or none</text>
+
+  <text x="28" y="376" font-size="16">plan</text>
+  <text x="28" y="398" font-size="14">docs/plan/wps.json</text>
+  <text x="28" y="418" font-size="14">owned globs and deps</text>
+  <text x="28" y="438" font-size="14">one brief per task</text>
+
+  <text x="220" y="260" font-size="16">skein dispatch</text>
+  <text x="220" y="282" font-size="14">claim, workspace</text>
+
+  <text x="220" y="350" font-size="16">driver</text>
+  <text x="220" y="372" font-size="14">Superset workspace</text>
+  <text x="220" y="392" font-size="14">or a git worktree</text>
+
+  <text x="384" y="70" font-size="13">workers in parallel</text>
+
+  <text x="396" y="110" font-size="16">worker</text>
+  <text x="396" y="132" font-size="14">worktree of its own</text>
+  <text x="396" y="152" font-size="13">branch &lt;type&gt;/&lt;slug&gt;-&lt;id&gt;</text>
+
+  <text x="396" y="222" font-size="16">worker</text>
+  <text x="396" y="244" font-size="14">worktree of its own</text>
+  <text x="396" y="264" font-size="13">branch &lt;type&gt;/&lt;slug&gt;-&lt;id&gt;</text>
+
+  <text x="396" y="334" font-size="16">worker</text>
+  <text x="396" y="356" font-size="14">worktree of its own</text>
+  <text x="396" y="376" font-size="13">branch &lt;type&gt;/&lt;slug&gt;-&lt;id&gt;</text>
+
+  <text x="612" y="224" font-size="16">gate</text>
+  <text x="612" y="248" font-size="14">nine checks in order</text>
+
+  <text x="702" y="292" font-size="13">money/pii only</text>
+
+  <text x="612" y="328" font-size="16">cross-model review</text>
+  <text x="612" y="352" font-size="14">read-only worktree</text>
+
+  <text x="612" y="432" font-size="16">skein merge</text>
+  <text x="612" y="456" font-size="14">gate again, squash</text>
+
+  <text x="612" y="534" font-size="16">main</text>
+  <text x="612" y="556" font-size="14">the base branch</text>
+
+  <text x="16" y="486" font-size="13">One gate, three callers: the worker before it claims done, the coordinator</text>
+  <text x="16" y="506" font-size="13">before it merges, and CI, which runs a subset, on each pull request.</text>
+  <text x="16" y="526" font-size="13">Three workers are drawn; two caps decide how many run at once, this</text>
+  <text x="16" y="546" font-size="13">machine's and the repository's.</text>
+</svg>
