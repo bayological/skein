@@ -516,7 +516,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-19.md",
-      "notes": "After all six fixes. The accept checks the fact sheet line for line above Drift and every code citation on an unchanged statement against the code diff since 0802bfe; the coordinator checks the lines it lists by hand. Owner, 26 Oct 2026: VERSION becomes 0.2.0, bumped by the coordinator after SK-18 merges and before this is dispatched."
+      "notes": "After all six fixes. The accept checks the fact sheet line for line above Drift and every code citation on an unchanged statement against the code diff since 0802bfe; the coordinator checks the lines it lists by hand. Owner, 26 Oct 2026: VERSION becomes 0.2.0, bumped by the coordinator after SK-18 merges and before this is dispatched.",
+      "done": true
     }
   ]
 }
