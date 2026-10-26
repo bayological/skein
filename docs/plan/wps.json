@@ -298,7 +298,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-10.md",
-      "notes": "The coordinator writes this itself from its run journal; never dispatch it. It also adds the README closing line the owner approved. Merge with skein merge SK-10 --no-gate once CI's gate check passes (no worker worktree)."
+      "notes": "The coordinator writes this itself from its run journal; never dispatch it. It also adds the README closing line the owner approved. Merge with skein merge SK-10 --no-gate once CI's gate check passes (no worker worktree).",
+      "done": true
     },
     {
       "id": "SK-11",
