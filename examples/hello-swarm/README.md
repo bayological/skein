@@ -31,7 +31,7 @@ dispatched in the same wave. HS-03 reads both functions, so it waits.
 ## Run it in a sandbox
 
 Copy the example out of this repository first. A copy with no origin remote runs in local
-mode: no board, no pull requests, no network. Run skein only against such a copy.
+mode: no board, no pull requests, nothing pushed. Run skein only against such a copy.
 
 ```bash
 sandbox=$(mktemp -d)
@@ -43,7 +43,8 @@ git add -A && git commit -qm "example: hello-swarm"
 
 Now scaffold the parts the example does not ship. `skein init` keeps the config and the plan
 that are already here, and adds the vendored runtime under `scripts/skein/`, `AGENTS.md`, the
-pre-push hook and the workspace lifecycle scripts.
+coordinator notes in `docs/plan/` (`COORDINATOR.md` and `COORDINATOR-PROMPT.md`), the pre-push
+hook and the workspace lifecycle scripts. Local mode writes no CI workflow.
 
 ```bash
 skein init
@@ -113,9 +114,17 @@ are scripted, so the recording is repeatable and costs nothing.
 
 ## Clean up
 
-Everything lives in the copy, including the `core.hooksPath` setting that `skein init` writes
-to the sandbox repository. Delete the directory:
+With nothing dispatched, everything lives in the copy, including the `core.hooksPath` setting
+that `skein init` writes to the sandbox repository. Deleting the directory is enough.
+
+A dispatch puts two things outside it. The local driver keeps each task's worktree under
+`~/.skein/worktrees` and its run log under `~/.skein/runs`, both in a folder named after the
+repository's directory, which here is the name of the sandbox folder. `skein merge` removes a
+merged task's worktree and leaves its run log.
 
 ```bash
-rm -rf "$sandbox"
+name=$(basename "${sandbox:?}") && rm -rf "$sandbox" ~/.skein/worktrees/"$name" ~/.skein/runs/"$name"
 ```
+
+Keep the `:?` guard. Without it an unset `sandbox` leaves `~/.skein/worktrees` as the whole
+argument, and the command takes every other project's worktrees with it.
