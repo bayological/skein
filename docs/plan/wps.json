@@ -237,7 +237,7 @@
       "brief": null,
       "coordinator": true,
       "ownerGate": true,
-      "notes": "Optional (docs/plan/docs-run.md): brief it only if SK-04 merges cleanly and the owner still wants the site; the accept list gets an internal link check then. coordinator: true because it owns a file under .github/. Owner gate before merge, and a second fact-check pass over the site."
+      "notes": "Optional (docs/plan/docs-run.md): brief it only if SK-04 merges cleanly and the owner still wants the site; the accept list gets an internal link check then. coordinator: true because it owns a file under .github/. Owner gate before merge, and a second fact-check pass over the site. Owner decided on 26 Oct 2026: skip for now; the README carries the two-minute read."
     },
     {
       "id": "SK-09",
@@ -287,16 +287,18 @@
         "SK-12"
       ],
       "owned": [
-        "docs/swarm-run.md"
+        "docs/swarm-run.md",
+        "README.md"
       ],
       "accept": [
         "test -s docs/swarm-run.md",
-        "! grep -n '—' docs/swarm-run.md"
+        "! grep -n '—' docs/swarm-run.md",
+        "grep -qF '[docs/swarm-run.md](docs/swarm-run.md)' README.md"
       ],
       "money": false,
       "pii": false,
-      "brief": null,
-      "notes": "The coordinator writes this itself (docs/plan/docs-run.md, Owner checkpoints); never dispatch it. Add SK-08 to its deps if the site is built. When it lands, the README gets its closing line."
+      "brief": "docs/plan/briefs/SK-10.md",
+      "notes": "The coordinator writes this itself from its run journal; never dispatch it. It also adds the README closing line the owner approved. Merge with skein merge SK-10 --no-gate once CI's gate check passes (no worker worktree)."
     },
     {
       "id": "SK-11",
