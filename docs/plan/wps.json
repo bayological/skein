@@ -33,13 +33,18 @@
       "slug": "kit-test-harness",
       "deps": [],
       "owned": [
-        "tests/**"
+        "tests/helpers.mjs",
+        "tests/gate.test.mjs",
+        "tests/plan.test.mjs",
+        "tests/sandbox.test.mjs"
       ],
-      "accept": [],
+      "accept": [
+        "bash docs/plan/accept/SK-00.sh"
+      ],
       "money": false,
       "pii": false,
-      "brief": null,
-      "notes": "Backlog from /skein-init: the gate's standard commands are a syntax pass and the sandbox smoke test only. Brief this after the docs run; wiring it into .skein/config.json standard is a coordinator change."
+      "brief": "docs/plan/briefs/SK-00.md",
+      "notes": "First of the kit-bug wave. Owner, 26 Oct 2026: go; the coordinator merges each kit fix once its gate passes and it has read the diff. After SK-00 merges, the coordinator adds node --test tests/*.test.mjs to .skein/config.json standard, so SK-13 to SK-18 run the suite in their gates. tests/helpers.mjs is the API their tests use."
     },
     {
       "id": "SK-01",
@@ -344,6 +349,167 @@
       "brief": "docs/plan/briefs/SK-12.md",
       "notes": "Follow-up from SK-09: the example README passed two task ids to one skein dispatch, which dispatches only the last.",
       "done": true
+    },
+    {
+      "id": "SK-13",
+      "title": "init: take values from a kept config, refuse contradicting flags",
+      "type": "fix",
+      "slug": "init-keeps-config",
+      "deps": [
+        "SK-00"
+      ],
+      "owned": [
+        "commands/init.sh",
+        "tests/init.test.mjs"
+      ],
+      "accept": [
+        "node --test tests/init.test.mjs",
+        "bash docs/plan/accept/SK-13.sh"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-13.md",
+      "notes": "Kit bug 1 from docs/swarm-run.md. Runs beside SK-14, SK-15 and SK-17 (disjoint files)."
+    },
+    {
+      "id": "SK-14",
+      "title": "dispatch, merge, review: refuse a second task id",
+      "type": "fix",
+      "slug": "one-task-per-call",
+      "deps": [
+        "SK-00"
+      ],
+      "owned": [
+        "commands/dispatch.sh",
+        "commands/merge.sh",
+        "commands/review.sh",
+        "tests/one-task.test.mjs"
+      ],
+      "accept": [
+        "node --test tests/one-task.test.mjs",
+        "bash docs/plan/accept/SK-14.sh"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-14.md",
+      "notes": "Kit bug 2. SK-16 also edits commands/dispatch.sh, so it waits for this."
+    },
+    {
+      "id": "SK-15",
+      "title": "Gate and plan: follow the config's baseBranch",
+      "type": "fix",
+      "slug": "honour-base-branch",
+      "deps": [
+        "SK-00"
+      ],
+      "owned": [
+        "lib/gate.mjs",
+        "lib/plan.mjs",
+        "tests/base-branch.test.mjs"
+      ],
+      "accept": [
+        "node --test tests/base-branch.test.mjs",
+        "bash docs/plan/accept/SK-15.sh"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-15.md",
+      "notes": "Kit bug 3. SK-16 (lib/plan.mjs) and SK-18 (lib/gate.mjs) wait for this."
+    },
+    {
+      "id": "SK-16",
+      "title": "dispatch: refuse a task that overlaps one in flight",
+      "type": "fix",
+      "slug": "refuse-overlapping-dispatch",
+      "deps": [
+        "SK-14",
+        "SK-15"
+      ],
+      "owned": [
+        "commands/dispatch.sh",
+        "lib/plan.mjs",
+        "tests/overlap.test.mjs"
+      ],
+      "accept": [
+        "node --test tests/overlap.test.mjs",
+        "bash docs/plan/accept/SK-16.sh"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-16.md",
+      "notes": "Kit bug 4. Shares commands/dispatch.sh with SK-14 and lib/plan.mjs with SK-15, hence the deps."
+    },
+    {
+      "id": "SK-17",
+      "title": "status: list task workspaces only",
+      "type": "fix",
+      "slug": "status-task-workspaces",
+      "deps": [
+        "SK-00"
+      ],
+      "owned": [
+        "commands/status.sh",
+        "tests/status.test.mjs"
+      ],
+      "accept": [
+        "node --test tests/status.test.mjs",
+        "bash docs/plan/accept/SK-17.sh"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-17.md",
+      "notes": "Kit bug 5."
+    },
+    {
+      "id": "SK-18",
+      "title": "Refuse a config version newer than the kit",
+      "type": "fix",
+      "slug": "check-config-version",
+      "deps": [
+        "SK-15"
+      ],
+      "owned": [
+        "lib/common.sh",
+        "commands/doctor.sh",
+        "lib/gate.mjs",
+        "tests/config-version.test.mjs"
+      ],
+      "accept": [
+        "node --test tests/config-version.test.mjs",
+        "bash docs/plan/accept/SK-18.sh"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-18.md",
+      "notes": "Kit bug 6. Shares lib/gate.mjs with SK-15, hence the dep. Writes a DRAFT ADR; the coordinator numbers it at merge."
+    },
+    {
+      "id": "SK-19",
+      "title": "Docs: record the kit fixes, citations moved with the code",
+      "type": "docs",
+      "slug": "docs-after-kit-fixes",
+      "deps": [
+        "SK-13",
+        "SK-14",
+        "SK-15",
+        "SK-16",
+        "SK-17",
+        "SK-18"
+      ],
+      "owned": [
+        "docs/facts/FACTS.md",
+        "docs/limitations.md",
+        "README.md",
+        "examples/hello-swarm/README.md",
+        "docs/demo/setup.sh"
+      ],
+      "accept": [
+        "bash docs/plan/accept/SK-19.sh"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-19.md",
+      "notes": "After all six fixes. The accept checks the fact sheet line for line above Drift and every code citation on an unchanged statement against the code diff since 0802bfe; the coordinator checks the lines it lists by hand. Owner, 26 Oct 2026: VERSION becomes 0.2.0, bumped by the coordinator after SK-18 merges and before this is dispatched."
     }
   ]
 }
