@@ -56,7 +56,7 @@
     <rect x="510" y="396" width="270" height="76" rx="6" fill="none" stroke="#768390" stroke-width="1.5"/>
     <text x="528" y="422" font-size="16" font-weight="600">worker fixes</text>
     <text x="528" y="442" font-size="14">on its branch. The coordinator</text>
-    <text x="528" y="462" font-size="14">sends fixes with skein send</text>
+    <text x="528" y="462" font-size="14">sends what to fix with skein send</text>
 
     <!-- the flow -->
     <g fill="none" stroke="#768390" stroke-width="1.5" marker-end="url(#ah)">
