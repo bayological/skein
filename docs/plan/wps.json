@@ -462,7 +462,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-17.md",
-      "notes": "Kit bug 5."
+      "notes": "Kit bug 5.",
+      "done": true
     },
     {
       "id": "SK-18",
