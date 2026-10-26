@@ -142,7 +142,8 @@
       "pii": false,
       "brief": "docs/plan/briefs/SK-04.md",
       "ownerGate": true,
-      "notes": "Owner gate (docs/plan/docs-run.md, rule 7): do not merge until the owner has read the diff and said yes. SK-09 fact-checks this branch first."
+      "notes": "Owner gate (docs/plan/docs-run.md, rule 7): do not merge until the owner has read the diff and said yes. SK-09 fact-checks this branch first.",
+      "done": true
     },
     {
       "id": "SK-05",
