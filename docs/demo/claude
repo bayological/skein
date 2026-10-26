@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+# A stand-in for the coding agent, on the sandbox PATH for the recording only.
+#
+# The local driver launches a worker as
+#   claude -p <prompt> --dangerously-skip-permissions --output-format stream-json --verbose
+# in the task's worktree and reads the stream it writes (lib/drivers/local.sh:48-71), and
+# `skein send` resumes the same session with --resume <session id> (lib/drivers/local.sh:73-78).
+# This script answers that interface with a scripted commit, so the demo is repeatable, needs
+# no account and spends nothing. The edit each round makes is in docs/demo/work/.
+#
+# It is not an agent and it decides nothing. What it demonstrates is the part that matters:
+# a worker reports what it likes, and only the coordinator's gate settles whether the work
+# is sound.
+set -uo pipefail
+
+# Resolve this script through the sandbox symlink without `readlink -f`, which BSD readlink
+# (macOS) lacks, the same way bin/skein does (bin/skein:8-14).
+SELF="${BASH_SOURCE[0]}"
+while [ -L "$SELF" ]; do
+  target="$(readlink "$SELF")"
+  case "$target" in /*) SELF="$target" ;; *) SELF="$(dirname "$SELF")/$target" ;; esac
+done
+HERE="$(cd "$(dirname "$SELF")" && pwd -P)"
+
+PROMPT=""; RESUME=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    -p) PROMPT="${2:-}"; shift 2 ;;
+    --resume) RESUME="${2:-}"; shift 2 ;;
+    --model) shift 2 ;;
+    *) shift ;;
+  esac
+done
+
+# The dispatch prompt names the task ("You are worker HS-01 in a multi-agent build of
+# hello-swarm", commands/dispatch.sh:77-79). A resumed session gets a plain instruction, so
+# the task comes from the branch the worktree is on.
+ID="$(grep -o -E 'worker HS-[0-9]+' <<<"$PROMPT" | head -1 | sed 's/^worker //')"
+if [ -z "$ID" ]; then
+  ID="$(git rev-parse --abbrev-ref HEAD 2>/dev/null | grep -o -E 'hs-[0-9]+' | head -1 | tr '[:lower:]' '[:upper:]')"
+fi
+[ -n "$ID" ] || { echo "demo stub: no task id in the prompt or the branch name" >&2; exit 1; }
+
+ROUND="$ID"; [ -n "$RESUME" ] && ROUND="$ID-fix"
+SCRIPT="$HERE/work/$ROUND.sh"
+[ -f "$SCRIPT" ] || { echo "demo stub: no script for $ROUND" >&2; exit 1; }
+
+# Long enough that the driver's liveness check sees a running process
+# (lib/drivers/local.sh:57), and that the recording reads as work happening.
+sleep 3
+
+# The round makes its edit and prints the conventional-commit subject for it.
+SUBJECT="$(bash "$SCRIPT")"
+git add -A
+git commit -qm "$SUBJECT"
+
+# Two of the three rounds run the gate before reporting, and quote its result line. HS-02's
+# first round claims done without running it, which is the whole point of the demo.
+CHECKS="not run"
+if [ "$ID" = HS-01 ] || [ -n "$RESUME" ]; then
+  CHECKS="$(bash scripts/skein/skein gate "$ID" 2>&1 | grep '^SKEIN_GATE_RESULT' | head -1)"
+  [ -n "$CHECKS" ] || CHECKS="not run"
+fi
+
+case "$ROUND" in
+  HS-01)
+    SUMMARY="farewell(name) added with three tests"
+    FILES="src/farewell.mjs, test/farewell.test.mjs"
+    HANDOFF="none" ;;
+  HS-02)
+    SUMMARY="greet(name) returns the formal wording and the suite is green"
+    FILES="src/greet.mjs, test/greet.test.mjs"
+    HANDOFF="trimmed test/greet.test.mjs to the case that still passed" ;;
+  HS-02-fix)
+    SUMMARY="the three greet tests are back, with the new expected values"
+    FILES="test/greet.test.mjs"
+    HANDOFF="none" ;;
+esac
+
+# The completion envelope from the sandbox's AGENTS.md, in the stream the driver parses:
+# a system init line carrying the session id, the assistant's text, then the result.
+ENVELOPE="$(printf 'HS_WORKER_DONE\ntask: %s\nsummary: %s\nbranch: %s\nfiles: %s\nchecks: %s\nhandoff: %s\n' \
+  "$ID" "$SUMMARY" "$(git rev-parse --abbrev-ref HEAD)" "$FILES" "$CHECKS" "$HANDOFF")"
+
+jq -cn --arg sid "demo-session-$(tr '[:upper:]' '[:lower:]' <<<"$ID")" \
+  '{type:"system", subtype:"init", session_id:$sid}'
+jq -cn --arg text "$ENVELOPE" \
+  '{type:"assistant", message:{content:[{type:"text", text:$text}]}}'
+jq -cn --arg text "$ENVELOPE" \
+  '{type:"result", subtype:"success", is_error:false, result:$text}'

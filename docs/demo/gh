@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+# An offline stand-in for the GitHub CLI, on the sandbox PATH for the recording only.
+# The kit asks `gh api user` for the coordinator's login when it records a claim or a merge
+# (lib/common.sh:82). Answering it here keeps the sandbox off the network and keeps a real
+# account out of the demo. Every other call fails, so the kit falls back to its local path.
+case "${1:-} ${2:-}" in
+  "api user") echo "skein-demo" ;;
+  *) exit 1 ;;
+esac
