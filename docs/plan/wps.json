@@ -441,7 +441,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-16.md",
-      "notes": "Kit bug 4. Shares commands/dispatch.sh with SK-14 and lib/plan.mjs with SK-15, hence the deps."
+      "notes": "Kit bug 4. Shares commands/dispatch.sh with SK-14 and lib/plan.mjs with SK-15, hence the deps.",
+      "done": true
     },
     {
       "id": "SK-17",
