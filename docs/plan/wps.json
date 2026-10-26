@@ -338,7 +338,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-12.md",
-      "notes": "Follow-up from SK-09: the example README passed two task ids to one skein dispatch, which dispatches only the last."
+      "notes": "Follow-up from SK-09: the example README passed two task ids to one skein dispatch, which dispatches only the last.",
+      "done": true
     }
   ]
 }
