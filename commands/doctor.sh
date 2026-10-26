@@ -6,7 +6,8 @@ bad()  { printf '  \033[31m✗\033[0m %s\n' "$*"; FAILS=$((FAILS+1)); }
 FAILS=0
 echo "skein doctor ($(cat "$SKEIN_HOME/VERSION" 2>/dev/null || echo dev)) in $ROOT"
 for b in git node jq; do command -v "$b" >/dev/null && ok "$b $(command -v "$b")" || bad "$b missing"; done
-have_config && ok ".skein/config.json ($(cfg .name), prefix $PREFIX, board $BOARD_TYPE, driver $DRIVER_TYPE)" || { bad "no .skein/config.json: run skein init"; exit 1; }
+have_config && ok ".skein/config.json ($(cfg .name), prefix $PREFIX, board $BOARD_TYPE, driver $DRIVER_TYPE, version $(cfg .version 1))" || { bad "no .skein/config.json: run skein init"; exit 1; }
+e="$(config_version_error)"; [ -z "$e" ] || bad "$e"
 [ -f "$PLAN" ] && ok "plan $PLAN ($(jq '.tasks|length' "$PLAN") tasks)" || bad "plan missing: $PLAN"
 [ -x "$ROOT/$(cfg .vendor scripts/skein)/skein" ] && ok "vendored skein $(cat "$ROOT/$(cfg .vendor scripts/skein)/VERSION" 2>/dev/null)" || bad "vendored scripts missing: run skein init"
 [ "$(git config core.hooksPath)" = "scripts/githooks" ] && ok "hooks path set" || bad "git config core.hooksPath scripts/githooks (not set)"
