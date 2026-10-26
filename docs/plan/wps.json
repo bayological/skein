@@ -416,7 +416,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-15.md",
-      "notes": "Kit bug 3. SK-16 (lib/plan.mjs) and SK-18 (lib/gate.mjs) wait for this."
+      "notes": "Kit bug 3. SK-16 (lib/plan.mjs) and SK-18 (lib/gate.mjs) wait for this.",
+      "done": true
     },
     {
       "id": "SK-16",
