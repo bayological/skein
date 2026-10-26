@@ -6,9 +6,10 @@
 //   node plan.mjs --json               same, as JSON
 //   node plan.mjs --check <TASK-ID>    validate the brief; exit 1 with reasons if not
 //   node plan.mjs --dispatchable       ids that could be dispatched now, one per line
+//   node plan.mjs --overlapping <ID>  unmerged tasks whose owned paths overlap <ID>'s
 //
-// "merged" means the plan says done: true (skein merge sets it) or origin/main carries the
-// task's squash-merged PR, whose subject ends with "(<ID>)" per the naming convention.
+// "merged" means the plan says done: true (skein merge sets it) or the config's base branch
+// carries the task's squash-merged PR, whose subject ends with "(<ID>)" per the convention.
 
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -17,6 +18,7 @@ const argv = process.argv.slice(2);
 const json = argv.includes("--json");
 const checkId = argv.includes("--check") ? argv[argv.indexOf("--check") + 1] : null;
 const listDispatchable = argv.includes("--dispatchable");
+const overlappingId = argv.includes("--overlapping") ? argv[argv.indexOf("--overlapping") + 1] : null;
 
 function sh(c) { try { return execSync(c, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }); } catch { return ""; } }
 const root = sh("git rev-parse --show-toplevel").trim(); if (root) process.chdir(root);
@@ -44,11 +46,13 @@ function overlaps(a, b) {
   return pa.startsWith(pb) || pb.startsWith(pa);
 }
 
-// No origin (local mode): the local main is the record.
-const mainRef = sh("git remote get-url origin").trim() ? (sh("git fetch -q origin"), "origin/main") : "main";
+// The config names the base branch (lib/common.sh:47 does the same for the bash commands).
+// No origin (local mode): the local base branch is the record.
+const BASE = config.baseBranch || "main";
+const mainRef = sh("git remote get-url origin").trim() ? (sh("git fetch -q origin"), `origin/${BASE}`) : BASE;
 const mainSubjects = sh(`git log --format=%s ${mainRef} -n 1000`).split("\n");
 // A task is merged when the plan says done: true (skein merge sets it), or when a commit
-// subject on origin/main is its squash-merged PR: "<type>(<scope>): <summary> (<ID>) (#<n>)".
+// subject on that base is its squash-merged PR: "<type>(<scope>): <summary> (<ID>) (#<n>)".
 function merged(t) {
   if (t.done === true) return true;
   const re = new RegExp(`\\(${t.id}\\)(?: \\(#\\d+\\))?\\s*$`, "i");
@@ -89,6 +93,19 @@ if (checkId) {
   }
   if (problems.length) { console.error(`skein brief --check ${checkId}: NOT READY\n  ${problems.join("\n  ")}`); process.exit(1); }
   console.log(`skein brief --check ${checkId}: ok (${t.brief})`); process.exit(0);
+}
+// --overlapping <ID>: the tasks whose owned paths are not free while <ID> runs, in plan
+// order. Readiness is irrelevant here: a task waiting on deps can still hold a workspace, so
+// only "merged" lets a glob go. Dispatch asks this, then whether any of them is in flight.
+if (overlappingId) {
+  const self = plan.tasks.find((x) => x.id.toLowerCase() === String(overlappingId).toLowerCase());
+  if (!self) { console.error(`skein plan: task ${overlappingId} not in ${PLAN_PATH}`); process.exit(2); }
+  const mine = self.owned || [];
+  for (const r of rows) {
+    if (r.id === self.id || r.status === "merged") continue;
+    if (r.owned.some((a) => mine.some((b) => overlaps(a, b)))) console.log(r.id);
+  }
+  process.exit(0);
 }
 if (listDispatchable) { for (const r of ready) console.log(r.id); process.exit(0); }
 if (json) { console.log(JSON.stringify({ tasks: rows, conflicts }, null, 2)); process.exit(0); }

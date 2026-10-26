@@ -18,7 +18,21 @@ CONFIG="$ROOT/.skein/config.json"
 USER_CONFIG="${SKEIN_USER_CONFIG:-$HOME/.skein/config.json}"
 
 have_config() { [ -f "$CONFIG" ]; }
-require_config() { have_config || die "no .skein/config.json here: run 'skein init' first"; }
+
+KIT_CONFIG_VERSION=1   # the config version this kit reads; lib/gate.mjs has the same number
+# config_version_error: why this kit cannot use the config, or nothing. A config with no
+# "version" key is version 1, as every config init wrote before the key was read.
+config_version_error() {
+  local v
+  v="$(jq -r 'if has("version") then .version else 1 end | if type == "number" and . == floor and . >= 0 then tostring else "invalid " + tojson end' "$CONFIG" 2>/dev/null)" \
+    || { echo ".skein/config.json is not valid JSON"; return 0; }
+  case "$v" in "invalid "*) echo ".skein/config.json has version ${v#invalid }; this kit understands version $KIT_CONFIG_VERSION"; return 0 ;; esac
+  [ "$v" -le "$KIT_CONFIG_VERSION" ] || echo ".skein/config.json is version $v; this kit understands version $KIT_CONFIG_VERSION: upgrade the kit"
+}
+require_config() {
+  have_config || die "no .skein/config.json here: run 'skein init' first"
+  local e; e="$(config_version_error)"; [ -z "$e" ] || die "$e"
+}
 
 # cfg <jq-path> [default]  — read one value from the repo config.
 cfg() {

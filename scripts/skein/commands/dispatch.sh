@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# skein dispatch <TASK> [--tag t] [--model m] [--agent a] [--effort e]
+# skein dispatch <TASK> [--tag t] [--model m] [--agent a] [--effort e] [--allow-overlap]
 # Claim the task on the board, create the workspace, wait for setup, launch the worker.
 # Prints one JSON line. Every refusal here has cost a rerun somewhere: a stale brief, a
 # workspace forked from old main, a worker racing the install, a cap already spent.
 . "$SKEIN_HOME/lib/common.sh"; require_config; load_board; load_driver; . "$SKEIN_HOME/lib/caps.sh"
 need git jq node
 
-TASK=""; TAG=running; MODEL="-"; AGENT=""; EFFORT=""
+TASK=""; TAG=running; MODEL="-"; AGENT=""; EFFORT=""; ALLOW_OVERLAP=""
 while [ $# -gt 0 ]; do case "$1" in
   --tag) TAG="$2"; shift 2 ;; --model) MODEL="$2"; shift 2 ;; --agent) AGENT="$2"; shift 2 ;; --effort) EFFORT="$2"; shift 2 ;;
-  -*) die "unknown flag $1" ;; *) TASK="$1"; shift ;; esac; done
-[ -n "$TASK" ] || die "usage: skein dispatch <TASK> [--tag t] [--model m] [--agent a] [--effort e]"
+  --allow-overlap) ALLOW_OVERLAP=1; shift ;;
+  -*) die "unknown flag $1" ;; *) [ -z "$TASK" ] || die "one task per call: got $TASK and $1"; TASK="$1"; shift ;; esac; done
+[ -n "$TASK" ] || die "usage: skein dispatch <TASK> [--tag t] [--model m] [--agent a] [--effort e] [--allow-overlap]"
 
 t="$(task_json "$TASK")"; ID="$(jq -r .id <<<"$t")"; TITLE="$(task_field "$t" title)"
 BRANCH="$(task_branch "$t")"; WS_NAME="$(task_ws_name "$t")"
@@ -37,6 +38,15 @@ BASE_REF="$(base_ref "$BASE")"; fetch_origin
 SYNC_HINT="push $BASE first (workspaces fork from origin)"; [ -n "$LOCAL_MODE" ] && SYNC_HINT="commit them on $BASE first (workspaces fork from it)"
 git -C "$ROOT" diff --quiet "$BASE_REF" -- "$(task_field "$t" brief)" "$PLAN" 2>/dev/null \
   || fail "brief or plan differs from $BASE_REF: $SYNC_HINT"
+
+# 1b. Not beside an overlapping task in flight (claimed on the board, or with a workspace
+#     here): owned paths are the lock. --allow-overlap skips this.
+if [ -z "$ALLOW_OVERLAP" ]; then
+  for other in $(node "$SKEIN_HOME/lib/plan.mjs" --overlapping "$ID"); do
+    { [ -n "$(board_owner "$other")" ] || [ -n "$(driver_find "$other")" ]; } \
+      && fail "$ID overlaps $other, which is in flight: wait for it to merge, or pass --allow-overlap"
+  done
+else log "--allow-overlap: not checking for overlapping tasks in flight"; fi
 
 # 2. A leftover branch from an earlier dispatch: harmless if it has no commits of its own
 #    (delete it so the workspace forks from today's origin), a stop if it has work on it.

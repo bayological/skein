@@ -9,7 +9,7 @@
 need jq; [ -n "$LOCAL_MODE" ] || need gh
 TASK=""; AGENT=""; MODEL=""
 while [ $# -gt 0 ]; do case "$1" in
-  --agent) AGENT="$2"; shift 2 ;; --model) MODEL="$2"; shift 2 ;; -*) die "unknown flag $1" ;; *) TASK="$1"; shift ;; esac; done
+  --agent) AGENT="$2"; shift 2 ;; --model) MODEL="$2"; shift 2 ;; -*) die "unknown flag $1" ;; *) [ -z "$TASK" ] || die "one task per call: got $TASK and $1"; TASK="$1"; shift ;; esac; done
 [ -n "$TASK" ] || die "usage: skein review <TASK> [--agent codex|claude] [--model m]"
 t="$(task_json "$TASK")"; ID="$(jq -r .id <<<"$t")"; BRANCH="$(task_branch "$t")"; SLUG="$(task_field "$t" slug)"
 [ -z "$AGENT" ] && AGENT="$(cfg .review.agent codex)"

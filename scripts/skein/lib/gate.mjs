@@ -83,7 +83,20 @@ const repoRoot = (shQuiet("git rev-parse --show-toplevel") || "").trim();
 if (!repoRoot) die("not inside a git repository");
 process.chdir(repoRoot);
 if (!existsSync(CONFIG_PATH)) die(`${CONFIG_PATH} not found: run 'skein init'`);
-const config = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+let config;
+try { config = JSON.parse(readFileSync(CONFIG_PATH, "utf8")); }
+catch { die(`${CONFIG_PATH} is not valid JSON`); }
+// The config version this gate reads; lib/common.sh has the same number as KIT_CONFIG_VERSION.
+// A config with no "version" key is version 1, as every config init wrote before the key was
+// read. A newer one stops the gate here, rather than being judged by only the checks it knows.
+const CONFIG_VERSION = 1;
+const configVersion = config.version === undefined ? 1 : config.version;
+if (!Number.isInteger(configVersion) || configVersion < 0) {
+  die(`${CONFIG_PATH} has version ${JSON.stringify(configVersion)}; this kit understands version ${CONFIG_VERSION}`);
+}
+if (configVersion > CONFIG_VERSION) {
+  die(`${CONFIG_PATH} is version ${configVersion}; this kit understands version ${CONFIG_VERSION}: upgrade the kit`);
+}
 function runStandardOnly(reason) {
   const cmds = config.standard || [];
   if (!cmds.length) die("no `standard` commands in .skein/config.json");
@@ -118,7 +131,8 @@ if (!taskId) die("no task id. usage: skein gate <task-id> | --from-branch");
 const task = plan.tasks.find((t) => t.id.toLowerCase() === taskId.toLowerCase());
 if (!task) die(`task "${taskId}" not found in ${PLAN_PATH}`);
 taskId = task.id;
-if (!baseRef) baseRef = shQuiet("git rev-parse --verify --quiet origin/main") ? "origin/main" : "main";
+const BASE = config.baseBranch || "main";
+if (!baseRef) baseRef = shQuiet(`git rev-parse --verify --quiet origin/${BASE}`) ? `origin/${BASE}` : BASE;
 process.stdout.write(`skein gate ${taskId} (base ${baseRef})\n`);
 
 // ---------------------------------------------------------------- diff

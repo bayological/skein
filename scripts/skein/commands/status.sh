@@ -11,12 +11,33 @@ board="$(board_list)"
 if [ -z "$board" ]; then echo "  no claimed tasks"; else printf '%s\n' "$board" | awk -F'\t' '{printf "  %-10s %-9s %-14s %s\n", $1, $2, $3, $4}'; fi
 echo
 
+# The plan's task ids, once: "<lowercase id>|<the plan's own casing>" per line.
+plan_ids=""
+[ -f "$PLAN" ] && plan_ids="$(jq -r '.tasks[]? | select(.id) | "\(.id|ascii_downcase)|\(.id)"' "$PLAN" 2>/dev/null)"
+
+# ws_task_id <workspace name> — the plan id this is a workspace name for, in the plan's own
+# casing, or empty. The two forms task_ws_name makes (lib/common.sh:71-75): the name carries
+# "(<ID>)", compared without case, as driver_find also finds it (lib/drivers/local.sh:99); or
+# the name is the lowercased id, the fallback for a task with no type or slug.
+ws_task_id() {
+  local lname lid id
+  lname="$(tr '[:upper:]' '[:lower:]' <<<"$1")"
+  while IFS='|' read -r lid id; do
+    [ -n "$lid" ] || continue
+    case "$lname" in *"($lid)"*) printf '%s' "$id"; return 0 ;; esac
+    [ "$lname" = "$lid" ] && { printf '%s' "$id"; return 0; }
+  done <<<"$plan_ids"
+  return 0
+}
+
 printf '%sworkers on this machine%s\n' "$B" "$R"
 workspaces="$(driver_list)"
-if [ -z "$workspaces" ]; then echo "  none"; fi
+listed=0; skipped=0
 while IFS=$'\t' read -r ws name path tags; do
   [ -n "$ws" ] || continue
-  id="$(grep -o -i -E "${PREFIX}-[a-z0-9]+" <<<"$name" | head -1 | tr '[:lower:]' '[:upper:]')"
+  id="$(ws_task_id "$name")"
+  if [ -z "$id" ]; then skipped=$((skipped+1)); continue; fi
+  listed=$((listed+1))
   term="$(driver_agent_terminal "$ws")"
   state="${D}no agent${R}"; said=""
   if [ -n "$term" ]; then
@@ -38,4 +59,6 @@ while IFS=$'\t' read -r ws name path tags; do
   printf '      commits %-3s uncommitted %-3s %s%s%s\n' "$commits" "$dirty" "$C" "$path" "$R"
   [ -n "$said" ] && printf '      last note  %s\n' "$said"
 done <<<"$workspaces"
+[ "$listed" -gt 0 ] || echo "  none"
+[ "$skipped" -gt 0 ] && printf '  %s%s other workspace(s) here carry no task id%s\n' "$D" "$skipped" "$R"
 printf '\n%sworking = spinner active · idle at prompt = finished a turn without an envelope · the gate, not this view, decides done%s\n' "$D" "$R"
