@@ -89,5 +89,8 @@ Kept so the file can be edited without breaking where it renders.
   stroke and every text fill `#768390`, which reads on white and on GitHub's dark `#0d1117`.
 - Neutral: the gate is the one box drawn with a 2.5px stroke; everything else is 1.5px.
 - `width="800"` with a viewBox 800 units wide. Titles 16px, body 14px, notes 13px.
+- Every box title is drawn at `font-weight="600"`, the weight `lifecycle.svg` uses, so the
+  two diagrams read as one set when the README carries both. That includes the two
+  coordinator boxes, whose titles keep their 14px size.
 - Arrowheads are stroked chevrons rather than markers, so nothing depends on a definition
   being honoured by a viewer.

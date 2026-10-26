@@ -53,54 +53,54 @@
     <path d="M687 502 L692 508 L697 502"/>
   </g>
 
-  <text x="28" y="98" font-size="16">your checkout</text>
-  <text x="40" y="131" font-size="14">coordinator</text>
-  <text x="40" y="175" font-size="14">coordinator</text>
+  <text x="28" y="98" font-size="16" font-weight="600">your checkout</text>
+  <text x="40" y="131" font-size="14" font-weight="600">coordinator</text>
+  <text x="40" y="175" font-size="14" font-weight="600">coordinator</text>
   <text x="28" y="202" font-size="13">any number</text>
 
-  <text x="28" y="258" font-size="16">board</text>
+  <text x="28" y="258" font-size="16" font-weight="600">board</text>
   <text x="28" y="280" font-size="14">GitHub issues,</text>
   <text x="28" y="300" font-size="14">Superset tasks,</text>
   <text x="28" y="320" font-size="14">or none</text>
 
-  <text x="28" y="376" font-size="16">plan</text>
+  <text x="28" y="376" font-size="16" font-weight="600">plan</text>
   <text x="28" y="398" font-size="14">docs/plan/wps.json</text>
   <text x="28" y="418" font-size="14">owned globs and deps</text>
   <text x="28" y="438" font-size="14">one brief per task</text>
 
-  <text x="220" y="260" font-size="16">skein dispatch</text>
+  <text x="220" y="260" font-size="16" font-weight="600">skein dispatch</text>
   <text x="220" y="282" font-size="14">claim, workspace</text>
 
-  <text x="220" y="350" font-size="16">driver</text>
+  <text x="220" y="350" font-size="16" font-weight="600">driver</text>
   <text x="220" y="372" font-size="14">Superset workspace</text>
   <text x="220" y="392" font-size="14">or a git worktree</text>
 
   <text x="384" y="70" font-size="13">workers in parallel</text>
 
-  <text x="396" y="110" font-size="16">worker</text>
+  <text x="396" y="110" font-size="16" font-weight="600">worker</text>
   <text x="396" y="132" font-size="14">worktree of its own</text>
   <text x="396" y="152" font-size="13">branch &lt;type&gt;/&lt;slug&gt;-&lt;id&gt;</text>
 
-  <text x="396" y="222" font-size="16">worker</text>
+  <text x="396" y="222" font-size="16" font-weight="600">worker</text>
   <text x="396" y="244" font-size="14">worktree of its own</text>
   <text x="396" y="264" font-size="13">branch &lt;type&gt;/&lt;slug&gt;-&lt;id&gt;</text>
 
-  <text x="396" y="334" font-size="16">worker</text>
+  <text x="396" y="334" font-size="16" font-weight="600">worker</text>
   <text x="396" y="356" font-size="14">worktree of its own</text>
   <text x="396" y="376" font-size="13">branch &lt;type&gt;/&lt;slug&gt;-&lt;id&gt;</text>
 
-  <text x="612" y="224" font-size="16">gate</text>
+  <text x="612" y="224" font-size="16" font-weight="600">gate</text>
   <text x="612" y="248" font-size="14">nine checks in order</text>
 
   <text x="702" y="292" font-size="13">money/pii only</text>
 
-  <text x="612" y="328" font-size="16">cross-model review</text>
+  <text x="612" y="328" font-size="16" font-weight="600">cross-model review</text>
   <text x="612" y="352" font-size="14">read-only worktree</text>
 
-  <text x="612" y="432" font-size="16">skein merge</text>
+  <text x="612" y="432" font-size="16" font-weight="600">skein merge</text>
   <text x="612" y="456" font-size="14">gate again, squash</text>
 
-  <text x="612" y="534" font-size="16">main</text>
+  <text x="612" y="534" font-size="16" font-weight="600">main</text>
   <text x="612" y="556" font-size="14">the base branch</text>
 
   <text x="16" y="486" font-size="13">One gate, three callers: the worker before it claims done, the coordinator</text>
