@@ -44,7 +44,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-00.md",
-      "notes": "First of the kit-bug wave. Owner, 26 Oct 2026: go; the coordinator merges each kit fix once its gate passes and it has read the diff. After SK-00 merges, the coordinator adds node --test tests/*.test.mjs to .skein/config.json standard, so SK-13 to SK-18 run the suite in their gates. tests/helpers.mjs is the API their tests use."
+      "notes": "First of the kit-bug wave. Owner, 26 Oct 2026: go; the coordinator merges each kit fix once its gate passes and it has read the diff. After SK-00 merges, the coordinator adds node --test tests/*.test.mjs to .skein/config.json standard, so SK-13 to SK-18 run the suite in their gates. tests/helpers.mjs is the API their tests use.",
+      "done": true
     },
     {
       "id": "SK-01",
