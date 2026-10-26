@@ -1,4 +1,7 @@
-# DRAFT SK-18: a config version newer than the kit is refused
+# 0001: a config version newer than the kit is refused
+
+Accepted 26 Oct 2026, with SK-18 (pull request #36). Drafted by the SK-18 worker; numbered by
+the coordinator.
 
 ## Context
 `skein init` has always written `"version": 1` into `.skein/config.json`, and nothing read it.
@@ -6,7 +9,7 @@ The bash commands take each value they need through `cfg`, which falls back to a
 the key is missing or the file does not parse; the gate parses the file and reads the keys it
 knows. So a kit handed a config written for a later kit ran as if it understood it: the
 commands silently used defaults for keys whose meaning had changed, and the gate judged the
-work with only the checks it knew — and still printed `status=PASS`.
+work with only the checks it knew, and still printed `status=PASS`.
 
 The key only becomes a version once something refuses to go on when it is too new.
 
@@ -22,7 +25,7 @@ no greater than the kit's. Anything else stops the run before any value is read:
 
 Three places apply it, with the same three messages: `require_config`, which every running
 command calls; `skein doctor`, which reports the version and flags a bad one; and the gate,
-which stops with exit 2 — the code it already uses for a config it cannot use — on stderr,
+which stops with exit 2 (the code it already uses for a config it cannot use) on stderr,
 with no result line, so a repository that parses `SKEIN_GATE_RESULT` sees no verdict rather
 than a false one. `skein plan` and `skein init` are unchanged: neither calls `require_config`.
 
