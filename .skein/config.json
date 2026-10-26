@@ -21,7 +21,8 @@
   "standard": [
     "jq empty .skein/config.json docs/plan/wps.json",
     "for f in bin/skein setup commands/*.sh lib/*.sh lib/*/*.sh .superset/*.sh scripts/githooks/pre-push; do bash -n \"$f\" || exit 1; done",
-    "for f in lib/*.mjs; do node --check \"$f\" || exit 1; done"
+    "for f in lib/*.mjs; do node --check \"$f\" || exit 1; done",
+    "node --test tests/*.test.mjs"
   ],
   "e2e": [
     ".superset/run.sh"
@@ -70,7 +71,20 @@
       "message": "The kit is dependency-free: import only node: built-ins or relative files (AGENTS.md rule 13, lib/gate.mjs:5). A docs app with its own package.json lives under docs/site/."
     }
   ],
-  "monotonic": [],
+  "monotonic": [
+    {
+      "file": "tests/gate.test.mjs",
+      "pattern": "\\btest\\("
+    },
+    {
+      "file": "tests/plan.test.mjs",
+      "pattern": "\\btest\\("
+    },
+    {
+      "file": "tests/sandbox.test.mjs",
+      "pattern": "\\btest\\("
+    }
+  ],
   "secretPatterns": [],
   "secretAllow": [],
   "worker": {
