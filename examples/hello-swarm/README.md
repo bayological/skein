@@ -108,9 +108,10 @@ scripts/skein/skein gate HS-02
 
 ## Dispatching real agents
 
-`skein dispatch HS-01 HS-02` with the `local` driver creates a git worktree per task and
-starts a Claude Code session in each, headless, against your account. The sessions write
-code, run the gate and report back. Expect real token spend and real wall-clock time.
+`skein dispatch HS-01`, then `skein dispatch HS-02`: each call takes one task id. With the
+`local` driver a call creates a git worktree for its task and starts a Claude Code session in
+it, headless, against your account. The sessions write code, run the gate and report back.
+Expect real token spend and real wall-clock time.
 
 For a run you can watch without that, see `docs/demo/` in this repository. Its worker commits
 are scripted, so the recording is repeatable and costs nothing.
