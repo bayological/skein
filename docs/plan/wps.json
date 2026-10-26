@@ -249,7 +249,8 @@
         "SK-03",
         "SK-05",
         "SK-06",
-        "SK-07"
+        "SK-07",
+        "SK-11"
       ],
       "owned": [
         "docs/plan/reviews/docs-factcheck.md"
@@ -258,7 +259,7 @@
         "test -s docs/plan/reviews/docs-factcheck.md",
         "grep -Eq '^\\| *claim *\\| *source *\\| *verdict *\\| *fix *\\|' docs/plan/reviews/docs-factcheck.md",
         "awk -F'|' '/^\\| *claim *\\|/ { t = 1; next } t && /^\\| *:?-/ { next } t && /^\\|/ { n++; v = $4; f = $5; gsub(/[ \\t*]/, \"\", v); gsub(/[ \\t]/, \"\", f); if (v !~ /^(ok|wrong|unsourced)$/) { print \"row \" n \": the verdict must be ok, wrong or unsourced: \" $0; bad = 1 } else if (v != \"ok\" && f == \"\") { print \"row \" n \": a \" v \" verdict needs a fix: \" $0; bad = 1 }; next } t { t = 0 } END { if (!n) { print \"no claim rows under the table header\"; bad = 1 }; exit bad }' docs/plan/reviews/docs-factcheck.md",
-        "for f in README.md docs/limitations.md examples/hello-swarm/README.md; do grep -qF \"$f\" docs/plan/reviews/docs-factcheck.md || { echo \"the fact-check never names $f\"; exit 1; }; done"
+        "for f in README.md docs/limitations.md examples/hello-swarm/README.md docs/demo/README.md; do grep -qF \"$f\" docs/plan/reviews/docs-factcheck.md || { echo \"the fact-check never names $f\"; exit 1; }; done"
       ],
       "money": false,
       "pii": false,
@@ -279,7 +280,8 @@
         "SK-05",
         "SK-06",
         "SK-07",
-        "SK-09"
+        "SK-09",
+        "SK-11"
       ],
       "owned": [
         "docs/swarm-run.md"
@@ -292,6 +294,28 @@
       "pii": false,
       "brief": null,
       "notes": "The coordinator writes this itself (docs/plan/docs-run.md, Owner checkpoints); never dispatch it. Add SK-08 to its deps if the site is built. When it lands, the README gets its closing line."
+    },
+    {
+      "id": "SK-11",
+      "title": "Example: pass --name and --prefix to skein init",
+      "type": "docs",
+      "slug": "example-init-flags",
+      "deps": [
+        "SK-05",
+        "SK-06"
+      ],
+      "owned": [
+        "examples/hello-swarm/**"
+      ],
+      "accept": [
+        "grep -qF 'skein init --name hello-swarm --prefix HS' examples/hello-swarm/README.md",
+        "! grep -nE '^skein init[[:space:]]*$' examples/hello-swarm/README.md",
+        "r=$(pwd) && d=$(mktemp -d) && cp -R examples/hello-swarm/. \"$d\"/ && cd \"$d\" && git init -q -b main && git add -A && git -c user.name=sandbox -c user.email=sandbox@localhost -c commit.gpgsign=false commit -qm sandbox && cmd=$(grep -m1 -E '^skein init ' README.md) && [ -n \"$cmd\" ] && \"$r/bin/skein\" ${cmd#skein } >/dev/null 2>&1 && grep -q 'HS_WORKER_DONE' AGENTS.md && grep -q 'HS_COORDINATOR' scripts/githooks/pre-push"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-11.md",
+      "notes": "Follow-up from SK-06: plain skein init in a mktemp -d sandbox renders AGENTS.md and the hook with a prefix derived from the folder name, not the config's HS. Runs beside SK-04 (disjoint files)."
     }
   ]
 }

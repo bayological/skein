@@ -120,8 +120,9 @@ The gate reads every added line of every file, prose included (AGENTS.md rule 17
 | SK-05 | Example repo | `examples/hello-swarm/**` | SK-01 | |
 | SK-07 | Limitations page | `docs/limitations.md` | SK-01 | |
 | SK-06 | Demo recording | `docs/demo/**`, `docs/assets/demo.*` | SK-05 | |
+| SK-11 | Example init flags | `examples/hello-swarm/**` | SK-05, 06 | follow-up from SK-06; runs beside SK-04 |
 | SK-04 | README upgrade | `README.md` | SK-01, 02, 03, 05, 06, 07 | owner gate |
-| SK-09 | Fact-check review | `docs/plan/reviews/docs-factcheck.md` | as SK-04 | reviews SK-04's branch |
+| SK-09 | Fact-check review | `docs/plan/reviews/docs-factcheck.md` | as SK-04, plus SK-11 | reviews SK-04's branch |
 | SK-08 | Docs site (optional) | `docs/site/**`, `.github/workflows/pages.yml` | SK-04 | owner gate; briefed later |
 | SK-10 | Swarm run log | `docs/swarm-run.md` | all | the coordinator writes it |
 
@@ -130,7 +131,8 @@ SK-02, SK-03, SK-05 and SK-07 run together once SK-01 merges.
 ## Owner checkpoints
 - **SK-09 before SK-04 merges.** SK-04's worker finishes and its gate passes; then SK-09 (a
   different model from the writers) fact-checks the README on SK-04's branch, plus
-  `docs/limitations.md` and `examples/hello-swarm/README.md` on `main`. Every "wrong" verdict
+  `docs/limitations.md`, `examples/hello-swarm/README.md` and `docs/demo/README.md` on `main`.
+  Every "wrong" verdict
   goes back to SK-04's worker as a fix before the owner reads anything.
 - **Owner review, before SK-04 (and SK-08) merge:**
   - Read the README diff top to bottom. Could you explain every sentence to a CTO?
