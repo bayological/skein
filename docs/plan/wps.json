@@ -1,0 +1,291 @@
+{
+  "version": 1,
+  "project": "skein",
+  "notes": [
+    "Source of truth for the task DAG. Coordinator-owned: no task edits this file.",
+    "A task may change only paths matching its `owned` globs, plus `alwaysAllowed`. `coordinatorOwned` always wins.",
+    "`brief: null` means NOT DISPATCHABLE. Write docs/plan/briefs/<id>.md first, then set the path here.",
+    "Keep `owned` globs disjoint between tasks that run at the same time; `skein plan` prints overlaps.",
+    "money: true and pii: true make a cross-model review mandatory before merge. `done: true` is set by skein merge."
+  ],
+  "modelPolicy": {
+    "principle": "The defects that matter are found by cross-model review, whichever model wrote the code. The reviewer is where model strength has the most leverage.",
+    "structure": "disjoint file ownership per brief; known-issue notes in briefs so nobody re-investigates; fix rounds resume the author session rather than starting a fresh agent"
+  },
+  "coordinatorOwned": [
+    "AGENTS.md",
+    ".skein/**",
+    "scripts/skein/**",
+    "docs/plan/**",
+    "scripts/githooks/**",
+    ".github/**",
+    ".superset/**",
+    "VERSION"
+  ],
+  "alwaysAllowed": [
+    "docs/adr/DRAFT-*.md"
+  ],
+  "tasks": [
+    {
+      "id": "SK-00",
+      "title": "Kit test harness: tests for the gate's checks and the plan",
+      "type": "test",
+      "slug": "kit-test-harness",
+      "deps": [],
+      "owned": [
+        "tests/**"
+      ],
+      "accept": [],
+      "money": false,
+      "pii": false,
+      "brief": null,
+      "notes": "Backlog from /skein-init: the gate's standard commands are a syntax pass and the sandbox smoke test only. Brief this after the docs run; wiring it into .skein/config.json standard is a coordinator change."
+    },
+    {
+      "id": "SK-01",
+      "title": "Fact sheet: every command, gate check, config key and mode, sourced",
+      "type": "docs",
+      "slug": "fact-sheet",
+      "deps": [],
+      "owned": [
+        "docs/facts/FACTS.md"
+      ],
+      "accept": [
+        "test -s docs/facts/FACTS.md",
+        "! grep -E '^- ' docs/facts/FACTS.md | grep -vE '([A-Za-z0-9_.-]+\\.(sh|mjs|md|json|tmpl|yml)|bin/skein|\\bsetup):[0-9]+|\\b[0-9a-f]{7,40}\\b'",
+        "for c in init upgrade doctor plan brief dispatch watch status send gate review merge; do grep -q \"skein $c\" docs/facts/FACTS.md || { echo \"FACTS.md never names: skein $c\"; exit 1; }; done",
+        "bt=$(printf '\\140'); for c in brief clean-tree boundary secrets test-integrity invariants standard e2e accept; do grep -qF \"$bt$c$bt\" docs/facts/FACTS.md || { echo \"FACTS.md never names the gate check $c in backticks\"; exit 1; }; done",
+        "bt=$(printf '\\140'); for k in version name prefix mode envelope coordinatorEnv plan briefs reviews vendor gate baseBranch board driver maxAgents install standard e2e invariants monotonic secretPatterns secretAllow worker review workerPrompt readyMarker setupScript setupTimeout setupFatal projects; do grep -qF \"$bt$k$bt\" docs/facts/FACTS.md || { echo \"FACTS.md never names the config key $k in backticks\"; exit 1; }; done",
+        "for v in SKEIN_MAX_AGENTS SKEIN_PROJECT_ID SKEIN_DRIVER SKEIN_BOARD SKEIN_USER_CONFIG SKEIN_WORKTREES SKEIN_RUNS SKEIN_STATE_DIR SKEIN_KIT_GIT; do grep -q \"$v\" docs/facts/FACTS.md || { echo \"FACTS.md never names: $v\"; exit 1; }; done",
+        "for s in init brief coordinate gate status; do grep -q \"/skein-$s\" docs/facts/FACTS.md || { echo \"FACTS.md never names: /skein-$s\"; exit 1; }; done"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-01.md"
+    },
+    {
+      "id": "SK-02",
+      "title": "Architecture diagram: SVG plus its source",
+      "type": "docs",
+      "slug": "architecture-diagram",
+      "deps": [
+        "SK-01"
+      ],
+      "owned": [
+        "docs/assets/architecture.*"
+      ],
+      "accept": [
+        "test -s docs/assets/architecture.md",
+        "xmllint --noout docs/assets/architecture.svg",
+        "[ \"$(wc -c < docs/assets/architecture.svg)\" -lt 60000 ]",
+        "! grep -Eiq '<image|<script|<foreignObject|href=.(https?:)?//' docs/assets/architecture.svg",
+        "! grep -n '—' docs/assets/architecture.svg docs/assets/architecture.md",
+        "for w in coordinator board wps.json brief worker worktree gate review merge; do grep -qi \"$w\" docs/assets/architecture.svg || { echo \"architecture.svg has no label containing: $w\"; exit 1; }; done"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-02.md"
+    },
+    {
+      "id": "SK-03",
+      "title": "Task lifecycle diagram: SVG plus its source",
+      "type": "docs",
+      "slug": "lifecycle-diagram",
+      "deps": [
+        "SK-01"
+      ],
+      "owned": [
+        "docs/assets/lifecycle.*"
+      ],
+      "accept": [
+        "test -s docs/assets/lifecycle.md",
+        "xmllint --noout docs/assets/lifecycle.svg",
+        "[ \"$(wc -c < docs/assets/lifecycle.svg)\" -lt 60000 ]",
+        "! grep -Eiq '<image|<script|<foreignObject|href=.(https?:)?//' docs/assets/lifecycle.svg",
+        "! grep -n '—' docs/assets/lifecycle.svg docs/assets/lifecycle.md",
+        "for w in brief dispatch watch gate review merge fix pii; do grep -qi \"$w\" docs/assets/lifecycle.svg || { echo \"lifecycle.svg has no label containing: $w\"; exit 1; }; done"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-03.md"
+    },
+    {
+      "id": "SK-04",
+      "title": "README upgrade",
+      "type": "docs",
+      "slug": "readme-upgrade",
+      "deps": [
+        "SK-01",
+        "SK-02",
+        "SK-03",
+        "SK-05",
+        "SK-06",
+        "SK-07"
+      ],
+      "owned": [
+        "README.md"
+      ],
+      "accept": [
+        "! grep -n '—' README.md",
+        "! grep -niE '\\b(simply|seamless(ly)?|powerful|robust|blazing)\\b' README.md",
+        "! grep -nE \"(^|[.!?] )That's\" README.md",
+        "for h in 'Why it exists' 'What you get' 'Quickstart' 'How a task moves' 'Local mode' 'Config' 'Principles' 'Upgrading' 'Limitations'; do grep -q \"^## $h\" README.md || { echo \"README.md lacks the section: ## $h\"; exit 1; }; done",
+        "grep -oE '\\]\\([^)]+\\)' README.md | sed -E 's/^\\]\\(//; s/\\)$//; s/[[:space:]].*$//; s/#.*$//' | grep -vE '^(https?:|mailto:|$)' | while read -r p; do [ -e \"$p\" ] || { echo \"broken link: $p\"; exit 1; }; done",
+        "grep -oE 'src=\"[^\"]+\"' README.md | sed -E 's/^src=\"//; s/\"$//' | grep -vE '^https?:' | while read -r p; do [ -e \"$p\" ] || { echo \"broken image: $p\"; exit 1; }; done",
+        "for f in docs/assets/architecture.svg docs/assets/lifecycle.svg docs/assets/demo.gif docs/limitations.md examples/hello-swarm; do grep -qF \"$f\" README.md || { echo \"README.md never links $f\"; exit 1; }; done",
+        "! grep -n 'swarm-run' README.md"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-04.md",
+      "ownerGate": true,
+      "notes": "Owner gate (docs/plan/docs-run.md, rule 7): do not merge until the owner has read the diff and said yes. SK-09 fact-checks this branch first."
+    },
+    {
+      "id": "SK-05",
+      "title": "Runnable example repo: examples/hello-swarm",
+      "type": "docs",
+      "slug": "hello-swarm-example",
+      "deps": [
+        "SK-01"
+      ],
+      "owned": [
+        "examples/hello-swarm/**"
+      ],
+      "accept": [
+        "cd examples/hello-swarm && node --test",
+        "jq -e '.mode == \"local\" and .board.type == \"none\" and .driver.type == \"local\" and .prefix == \"HS\" and (.monotonic | length) > 0' examples/hello-swarm/.skein/config.json",
+        "test -s examples/hello-swarm/README.md && test -s examples/hello-swarm/package-lock.json",
+        "for p in AGENTS.md scripts/skein .github .superset docs/plan/COORDINATOR.md; do ! test -e \"examples/hello-swarm/$p\" || { echo \"examples/hello-swarm/$p: skein init renders this in the sandbox, so do not commit it\"; exit 1; }; done",
+        "r=$(pwd) && d=$(mktemp -d) && cp -R examples/hello-swarm/. \"$d\"/ && cd \"$d\" && git init -q -b main && git add -A && git -c user.name=sandbox -c user.email=sandbox@localhost -c commit.gpgsign=false commit -qm sandbox && node \"$r/lib/plan.mjs\" --json > \"$d.json\" && [ \"$(jq '.tasks | length' \"$d.json\")\" = 3 ] && [ \"$(jq '[.tasks[] | select(.status == \"ready\")] | length' \"$d.json\")\" = 2 ] && [ \"$(jq '.conflicts | length' \"$d.json\")\" = 0 ]"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-05.md"
+    },
+    {
+      "id": "SK-06",
+      "title": "Demo recording: scripted vhs tape and GIF",
+      "type": "docs",
+      "slug": "demo-recording",
+      "deps": [
+        "SK-05"
+      ],
+      "owned": [
+        "docs/demo/**",
+        "docs/assets/demo.*"
+      ],
+      "accept": [
+        "test -f docs/demo/demo.tape",
+        "test -s docs/assets/demo.gif && [ \"$(wc -c < docs/assets/demo.gif)\" -lt 5242880 ]",
+        "d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 docs/assets/demo.gif) && awk -v d=\"$d\" 'BEGIN { exit !(d >= 60 && d <= 90) }'",
+        "! strings docs/assets/demo.gif docs/demo/* 2>/dev/null | grep -Ei '/home/|/Users/|@gmail|token'",
+        "grep -qi 'worker commits scripted for the recording' docs/demo/README.md",
+        "! grep -rn '—' docs/demo"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-06.md"
+    },
+    {
+      "id": "SK-07",
+      "title": "Limitations page",
+      "type": "docs",
+      "slug": "limitations-page",
+      "deps": [
+        "SK-01"
+      ],
+      "owned": [
+        "docs/limitations.md"
+      ],
+      "accept": [
+        "test -s docs/limitations.md",
+        "! grep -E '^- ' docs/limitations.md | grep -vE '([A-Za-z0-9_.-]+\\.(sh|mjs|md|json|tmpl|yml)|bin/skein|\\bsetup):[0-9]+|\\b[0-9a-f]{7,40}\\b|\\[OWNER'",
+        "grep -q '\\[OWNER' docs/limitations.md",
+        "! grep -n '—' docs/limitations.md"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-07.md"
+    },
+    {
+      "id": "SK-08",
+      "title": "Docs site (optional): Next.js and Fumadocs, static export",
+      "type": "docs",
+      "slug": "docs-site",
+      "deps": [
+        "SK-04"
+      ],
+      "owned": [
+        "docs/site/**",
+        ".github/workflows/pages.yml"
+      ],
+      "accept": [
+        "cd docs/site && npm ci && npm run build && test -f out/index.html",
+        "! grep -rn '—' docs/site/content",
+        "! grep -rEil 'googletagmanager|google-analytics|gtag\\(|plausible\\.io|segment\\.(com|io)|posthog|hotjar' docs/site/out"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": null,
+      "coordinator": true,
+      "ownerGate": true,
+      "notes": "Optional (docs/plan/docs-run.md): brief it only if SK-04 merges cleanly and the owner still wants the site; the accept list gets an internal link check then. coordinator: true because it owns a file under .github/. Owner gate before merge, and a second fact-check pass over the site."
+    },
+    {
+      "id": "SK-09",
+      "title": "Cross-model fact-check of the docs",
+      "type": "docs",
+      "slug": "docs-factcheck",
+      "deps": [
+        "SK-01",
+        "SK-02",
+        "SK-03",
+        "SK-05",
+        "SK-06",
+        "SK-07"
+      ],
+      "owned": [
+        "docs/plan/reviews/docs-factcheck.md"
+      ],
+      "accept": [
+        "test -s docs/plan/reviews/docs-factcheck.md",
+        "grep -Eq '^\\| *claim *\\| *source *\\| *verdict *\\| *fix *\\|' docs/plan/reviews/docs-factcheck.md",
+        "awk -F'|' '/^\\| *claim *\\|/ { t = 1; next } t && /^\\| *:?-/ { next } t && /^\\|/ { n++; v = $4; f = $5; gsub(/[ \\t*]/, \"\", v); gsub(/[ \\t]/, \"\", f); if (v !~ /^(ok|wrong|unsourced)$/) { print \"row \" n \": the verdict must be ok, wrong or unsourced: \" $0; bad = 1 } else if (v != \"ok\" && f == \"\") { print \"row \" n \": a \" v \" verdict needs a fix: \" $0; bad = 1 }; next } t { t = 0 } END { if (!n) { print \"no claim rows under the table header\"; bad = 1 }; exit bad }' docs/plan/reviews/docs-factcheck.md",
+        "for f in README.md docs/limitations.md examples/hello-swarm/README.md; do grep -qF \"$f\" docs/plan/reviews/docs-factcheck.md || { echo \"the fact-check never names $f\"; exit 1; }; done"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-09.md",
+      "coordinator": true,
+      "notes": "Dispatch only after SK-04's worker reports DONE and its gate passes: it reviews SK-04's branch before the owner does. Dispatch with --model claude-fable-5-1, a different model from the writers (codex here is a shim, docs/plan/COORDINATOR.md). coordinator: true because its file is under docs/plan/."
+    },
+    {
+      "id": "SK-10",
+      "title": "Swarm run log",
+      "type": "docs",
+      "slug": "swarm-run-log",
+      "deps": [
+        "SK-01",
+        "SK-02",
+        "SK-03",
+        "SK-04",
+        "SK-05",
+        "SK-06",
+        "SK-07",
+        "SK-09"
+      ],
+      "owned": [
+        "docs/swarm-run.md"
+      ],
+      "accept": [
+        "test -s docs/swarm-run.md",
+        "! grep -n '—' docs/swarm-run.md"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": null,
+      "notes": "The coordinator writes this itself (docs/plan/docs-run.md, Owner checkpoints); never dispatch it. Add SK-08 to its deps if the site is built. When it lands, the README gets its closing line."
+    }
+  ]
+}

@@ -1,0 +1,89 @@
+{
+  "version": 1,
+  "name": "skein",
+  "prefix": "SK",
+  "envelope": "SK_WORKER",
+  "coordinatorEnv": "SK_COORDINATOR",
+  "plan": "docs/plan/wps.json",
+  "briefs": "docs/plan/briefs",
+  "vendor": "scripts/skein",
+  "gate": "scripts/skein/skein gate",
+  "baseBranch": "main",
+  "board": {
+    "type": "github",
+    "repo": "bayological/skein"
+  },
+  "driver": {
+    "type": "superset"
+  },
+  "maxAgents": 4,
+  "install": "true",
+  "standard": [
+    "jq empty .skein/config.json docs/plan/wps.json",
+    "for f in bin/skein setup commands/*.sh lib/*.sh lib/*/*.sh .superset/*.sh scripts/githooks/pre-push; do bash -n \"$f\" || exit 1; done",
+    "for f in lib/*.mjs; do node --check \"$f\" || exit 1; done"
+  ],
+  "e2e": [
+    ".superset/run.sh"
+  ],
+  "invariants": [
+    {
+      "name": "no-em-dash-in-docs",
+      "pattern": "—",
+      "except": [
+        "docs/facts/**",
+        "docs/plan/**",
+        "docs/adr/**",
+        "AGENTS.md",
+        "bin/**",
+        "commands/**",
+        "lib/**",
+        "skills/**",
+        "templates/**",
+        "setup",
+        "scripts/**",
+        ".superset/**",
+        ".skein/**",
+        ".github/**"
+      ],
+      "message": "No em dashes in docs copy (docs/plan/docs-run.md, writing rules): use a comma, a colon or two sentences."
+    },
+    {
+      "name": "portable-shell",
+      "pattern": "\\breadlink -f|\\bsed -i|\\bgrep -[A-Za-z]*P|\\bdate -d|\\bmapfile\\b|\\breadarray\\b|\\bdeclare -A|\\$\\{[A-Za-z_][A-Za-z0-9_]*(,,|\\^\\^)",
+      "except": [
+        "**/*.md",
+        "**/*.mdx",
+        ".skein/**"
+      ],
+      "message": "The kit runs on macOS (BSD tools, bash 3.2): no readlink -f, sed -i, grep -P, date -d, mapfile, readarray, declare -A or ${x,,} (AGENTS.md rule 14, bin/skein:8)."
+    },
+    {
+      "name": "node-builtins-only",
+      "pattern": "(?:^\\s*(?:import\\b[^\"'`]*?|\\}\\s*)from\\s*|^\\s*import\\s*|\\b(?:require|import)\\(\\s*)[\"'](?!node:|\\.{1,2}/|(?:assert|buffer|child_process|crypto|events|fs|http|https|module|net|os|path|process|readline|stream|timers|tty|url|util|worker_threads|zlib)(?:/[a-z_]+)?[\"'])",
+      "except": [
+        "**/*.md",
+        "**/*.mdx",
+        "docs/site/**",
+        ".skein/**"
+      ],
+      "message": "The kit is dependency-free: import only node: built-ins or relative files (AGENTS.md rule 13, lib/gate.mjs:5). A docs app with its own package.json lives under docs/site/."
+    }
+  ],
+  "monotonic": [],
+  "secretPatterns": [],
+  "secretAllow": [],
+  "worker": {
+    "agent": "claude",
+    "model": "claude-opus-5",
+    "effort": "high"
+  },
+  "review": {
+    "agent": "codex",
+    "model": "gpt-6-astra",
+    "fallbackModel": "claude-fable-5-1"
+  },
+  "readyMarker": "workspace '.*' ready",
+  "setupScript": ".superset/setup.sh",
+  "setupTimeout": 300
+}
