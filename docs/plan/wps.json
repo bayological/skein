@@ -315,7 +315,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-11.md",
-      "notes": "Follow-up from SK-06: plain skein init in a mktemp -d sandbox renders AGENTS.md and the hook with a prefix derived from the folder name, not the config's HS. Runs beside SK-04 (disjoint files)."
+      "notes": "Follow-up from SK-06: plain skein init in a mktemp -d sandbox renders AGENTS.md and the hook with a prefix derived from the folder name, not the config's HS. Runs beside SK-04 (disjoint files).",
+      "done": true
     }
   ]
 }
