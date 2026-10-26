@@ -370,7 +370,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-13.md",
-      "notes": "Kit bug 1 from docs/swarm-run.md. Runs beside SK-14, SK-15 and SK-17 (disjoint files)."
+      "notes": "Kit bug 1 from docs/swarm-run.md. Runs beside SK-14, SK-15 and SK-17 (disjoint files).",
+      "done": true
     },
     {
       "id": "SK-14",
