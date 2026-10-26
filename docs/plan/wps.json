@@ -393,7 +393,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-14.md",
-      "notes": "Kit bug 2. SK-16 also edits commands/dispatch.sh, so it waits for this."
+      "notes": "Kit bug 2. SK-16 also edits commands/dispatch.sh, so it waits for this.",
+      "done": true
     },
     {
       "id": "SK-15",
