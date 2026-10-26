@@ -14,7 +14,7 @@ read first if you want to know what goes wrong in practice.
 
 - The Superset driver drives only workspaces on this host. Superset routes a call that names a workspace by id to whichever host owns it, so every id-addressed call first proves the workspace is local and refuses otherwise (`docs/facts/FACTS.md:313`).
 - The local driver runs `claude` and refuses any other agent, and `claude` has to be on `PATH` for it to work at all (`docs/facts/FACTS.md:325`, `docs/facts/FACTS.md:15`).
-- In local mode nothing is pushed and there are no pull requests: workers commit on their branch, `skein merge` squashes into the base branch in the coordinator's own checkout, and getting the work to GitHub is a manual push (`docs/facts/FACTS.md:351`, `README.md:76`).
+- In local mode nothing is pushed and there are no pull requests: workers commit on their branch, and `skein merge` squashes into the base branch in the coordinator's own checkout and pushes nothing (`docs/facts/FACTS.md:351`, `docs/facts/FACTS.md:359`).
 - Local mode also refuses `skein merge --no-gate`, because that flag trusts a CI gate check and local mode writes no CI workflow (`docs/facts/FACTS.md:358`, `docs/facts/FACTS.md:176`).
 
 ## The gate
