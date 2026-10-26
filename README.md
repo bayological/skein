@@ -65,7 +65,7 @@ cp -R ~/.claude/skills/skein/examples/hello-swarm/. "$sandbox"/
 cd "$sandbox"
 git init -q -b main
 git add -A && git commit -qm "example: hello-swarm"
-skein init --name hello-swarm --prefix HS
+skein init
 git add -A && git commit -qm "chore: skein init"
 skein plan
 ```
@@ -179,8 +179,8 @@ machine, and cross-model review falls back to a Claude model when `codex` cannot
 and test-integrity checks match fixed lists of key shapes and weakener tokens, so a credential or
 a gutted test shaped like none of them passes. Both read every added line of every file, so a
 line of prose that spells out one of those tokens fails the gate the way code does. `skein plan`
-reports ownership overlaps among ready tasks, and nothing refuses a dispatch of two tasks that
-overlap; the gate's default base is `origin/main`, or `main`, whatever `baseBranch` says.
+reports ownership overlaps among ready tasks, and `skein dispatch` refuses a task that overlaps
+one in flight, though two coordinators dispatching at the same moment can both pass that check.
 [docs/limitations.md](docs/limitations.md) has the rest, each line traced to the fact sheet.
 
 This README, both diagrams, the example and the demo were built by a skein swarm working on

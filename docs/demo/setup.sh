@@ -62,9 +62,9 @@ export SKEIN_USER_CONFIG="$D/machine.json"
   printf 'node_modules/\n' >> .git/info/exclude
   git add -A
   git commit -qm "example: hello-swarm"
-  # --name and --prefix matter even though the example ships its own .skein/config.json:
-  # init keeps that config but renders AGENTS.md from what it detects, and what it detects
-  # from a directory called "repo" is the prefix REPO (commands/init.sh:23-27).
+  # The flags match the example's own .skein/config.json, which init keeps: it takes the
+  # name, prefix, board and driver from that config, and refuses a flag that contradicts it
+  # unless --force-templates rewrites the config (commands/init.sh:22-37).
   skein init --name hello-swarm --prefix HS --board none --driver local >/dev/null 2>&1
   git add -A
   git commit -qm "chore: skein init"
