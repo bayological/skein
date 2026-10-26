@@ -1,7 +1,7 @@
 # skein fact sheet
 
-One source of truth for what skein does, extracted from the code at commit 98bd151
-(version 0.1.3). Every top-level bullet ends in the file and line it came from. Where the
+One source of truth for what skein does, extracted from the code at commit 4c2e2ef
+(version 0.2.0). Every top-level bullet ends in the file and line it came from. Where the
 README or the usage text disagrees with the code, the code is recorded here and the
 disagreement is listed under "Drift".
 
@@ -11,8 +11,8 @@ disagreement is listed under "Drift".
 - Every command requires `git`, `node` and `jq`; a command that touches a board or a driver also needs `gh` or the Superset CLI (`lib/common.sh:3`, `lib/common.sh:12`).
 - `gh` is required by `skein review` and `skein merge` only outside local mode (`commands/review.sh:9`, `commands/merge.sh:11`).
 - The Superset CLI is required by the Superset board and the Superset driver (`lib/boards/superset.sh:7`, `lib/drivers/superset.sh:25`).
-- `codex` is optional: `skein review` falls back to Claude when `codex` cannot run, and `skein doctor` reports its absence as a note rather than a failure (`commands/review.sh:18-20`, `commands/doctor.sh:28`).
-- `claude` is required by the local driver (`lib/drivers/local.sh:9`), which is also what `skein doctor` checks when the driver is `local` (`commands/doctor.sh:26`).
+- `codex` is optional: `skein review` falls back to Claude when `codex` cannot run, and `skein doctor` reports its absence as a note rather than a failure (`commands/review.sh:18-20`, `commands/doctor.sh:29`).
+- `claude` is required by the local driver (`lib/drivers/local.sh:9`), which is also what `skein doctor` checks when the driver is `local` (`commands/doctor.sh:27`).
 - `./setup` symlinks each directory under `skills/` to `$HOME/.claude/skills/skein-<name>` and `bin/skein` to `$HOME/.local/bin/skein` (`setup:13-16`).
 - Both destinations are overridable: `CLAUDE_SKILLS_DIR` for the skills directory and `SKEIN_BIN_DIR` for the bin directory (`setup:7-8`).
 - `./setup` warns when the bin directory is not on `PATH`, then prints the installed version (`setup:17`, `setup:19`).
@@ -30,20 +30,20 @@ detected by the absence of a sibling `commands/` directory (`bin/skein:8-18`).
 
 ### `skein init`
 
-- Scaffolds a repository: `.skein/config.json`, the vendored runtime, `AGENTS.md`, `docs/plan/`, CI, the pre-push hook and the Superset lifecycle scripts (`commands/init.sh:6-9`).
-- Flags: `--name <n>`, `--prefix <P>`, `--board github|superset|none`, `--driver superset|local` (default `superset`), `--base <branch>`, `--force-templates` (`commands/init.sh:14-18`).
-- Any other flag is refused with "unknown flag" (`commands/init.sh:18`).
-- It refuses to run without the kit's `templates/` directory, so a vendored copy cannot run it (`commands/init.sh:12`); `init.sh` and `upgrade.sh` are deleted from the vendored copy (`commands/init.sh:87`).
-- It refuses `--board github` in local mode, because the GitHub board needs an origin remote (`commands/init.sh:22`).
-- Defaults it derives: the name from the repository directory name, the prefix from the name uppercased up to the first hyphen, stripped to `A-Z0-9` and cut to six characters, and the base branch from `origin/HEAD` falling back to `main` (`commands/init.sh:23-25`).
-- It detects the toolchain from the lockfile or manifest present (pnpm, bun, yarn, npm, cargo, uv, go) and fills `install`, `standard` and the CI setup step from it (`commands/init.sh:31-62`).
-- For a Node package manager the `standard` commands are whichever of `typecheck`, `lint` and `test` exist as scripts in `package.json` (`commands/init.sh:45`).
-- Idempotent: an existing `.skein/config.json` and existing rendered files are kept unless `--force-templates` is passed (`commands/init.sh:68`, `commands/init.sh:102`).
-- The vendored runtime is always refreshed, including on a repeat run (`commands/init.sh:85-90`).
-- The pre-push hook is the one exception to "left alone": it is rendered with `always` (`commands/init.sh:123`).
-- In local mode it writes no CI workflow and says so (`commands/init.sh:121-122`).
-- It appends `.superset/config.local.json` to `.gitignore`, adds the vendor glob to `knip.json` when that file exists, and sets `core.hooksPath` to `scripts/githooks` (`commands/init.sh:128-133`).
-- It prints a four-step "Next" block rather than a JSON line (`commands/init.sh:135-145`).
+- Scaffolds a repository: `.skein/config.json`, the vendored runtime, `AGENTS.md`, `docs/plan/`, CI, the pre-push hook and the Superset lifecycle scripts (`commands/init.sh:6-7`).
+- Flags: `--name <n>`, `--prefix <P>`, `--board github|superset|none`, `--driver superset|local`, `--base <branch>`, `--force-templates` (`commands/init.sh:16-20`); the driver falls back to `superset` only when neither a flag nor a kept config gives one (`commands/init.sh:38`).
+- Any other flag is refused with "unknown flag" (`commands/init.sh:20`).
+- It refuses to run without the kit's `templates/` directory, so a vendored copy cannot run it (`commands/init.sh:14`); `init.sh` and `upgrade.sh` are deleted from the vendored copy (`commands/init.sh:111`).
+- It refuses `--board github` in local mode, because the GitHub board needs an origin remote (`commands/init.sh:41`).
+- Defaults it derives, each only when neither a flag nor a kept config gives the value: the name from the repository directory name, the prefix from the name uppercased up to the first hyphen, stripped to `A-Z0-9` and cut to six characters, and the base branch from `origin/HEAD` falling back to `main` (`commands/init.sh:42-44`).
+- It detects the toolchain from the lockfile or manifest present (pnpm, bun, yarn, npm, cargo, uv, go) and fills `install`, `standard` and the CI setup step from it (`commands/init.sh:55-86`).
+- For a Node package manager the `standard` commands are whichever of `typecheck`, `lint` and `test` exist as scripts in `package.json` (`commands/init.sh:69`).
+- Idempotent: a kept `.skein/config.json` and existing rendered files are left alone unless `--force-templates` (`commands/init.sh:92`, `commands/init.sh:126`). The kept config also supplies the name, prefix, base, board and driver that no flag gives, and a flag that contradicts it is refused with `<flag> <value> differs from the kept .skein/config.json (<kept value>)` unless `--force-templates` rewrites the config (`commands/init.sh:22-37`).
+- The vendored runtime is always refreshed, including on a repeat run (`commands/init.sh:109-114`).
+- The pre-push hook is the one exception to "left alone": it is rendered with `always` (`commands/init.sh:147`).
+- In local mode it writes no CI workflow and says so (`commands/init.sh:145-146`).
+- It appends `.superset/config.local.json` to `.gitignore`, adds the vendor glob to `knip.json` when that file exists, and sets `core.hooksPath` to `scripts/githooks` (`commands/init.sh:152-157`).
+- It prints a four-step "Next" block rather than a JSON line (`commands/init.sh:159-169`).
 
 ### `skein upgrade`
 
@@ -57,22 +57,22 @@ detected by the absence of a sibling `commands/` directory (`bin/skein:8-18`).
 ### `skein doctor`
 
 - Checks this machine and this repository before coordinating, and is read-only (`commands/doctor.sh:2`).
-- Takes no flags (`commands/doctor.sh:1-31`).
-- It checks `git`, `node` and `jq` on `PATH`, the config, the plan file and its task count, the vendored `skein` and its version, and `core.hooksPath` (`commands/doctor.sh:8-12`).
-- In local mode it reports local mode; otherwise it checks that origin is reachable (`commands/doctor.sh:13-14`).
-- Board checks: `github` needs `gh` authenticated and fails in local mode; `superset` needs the Superset CLI authenticated; `none` always passes (`commands/doctor.sh:15-20`).
-- Driver checks: `superset` resolves the project id for this checkout; `local` needs `claude` on `PATH` (`commands/doctor.sh:21-27`).
-- It reports both caps and the `standard` commands, and fails when there are none (`commands/doctor.sh:29-30`).
-- It exits 1 when any check failed, after printing the count (`commands/doctor.sh:31`).
+- Takes no flags (`commands/doctor.sh:1-32`).
+- It checks `git`, `node` and `jq` on `PATH`, the config and the version it declares, the plan file and its task count, the vendored `skein` and its version, and `core.hooksPath`; a config version this kit cannot use is reported as a failed check (`commands/doctor.sh:8-13`).
+- In local mode it reports local mode; otherwise it checks that origin is reachable (`commands/doctor.sh:14-15`).
+- Board checks: `github` needs `gh` authenticated and fails in local mode; `superset` needs the Superset CLI authenticated; `none` always passes (`commands/doctor.sh:16-21`).
+- Driver checks: `superset` resolves the project id for this checkout; `local` needs `claude` on `PATH` (`commands/doctor.sh:22-28`).
+- It reports both caps and the `standard` commands, and fails when there are none (`commands/doctor.sh:30-31`).
+- It exits 1 when any check failed, after printing the count (`commands/doctor.sh:32`).
 
 ### `skein plan`
 
 - The task DAG, read-only: each task's readiness and the ownership overlaps that decide what can run together (`lib/plan.mjs:2-3`).
 - It passes every argument through to `lib/plan.mjs` (`commands/plan.sh:3`).
-- Flags: `--json` for the same data as JSON, `--check <TASK-ID>` to validate a brief, and `--dispatchable` for the ids that could be dispatched now, one per line (`lib/plan.mjs:5-8`, `lib/plan.mjs:16-19`).
-- It exits 2 when the plan file is missing (`lib/plan.mjs:26`).
-- `--check` exits 1 with one line per problem, or 0 with "ok" (`lib/plan.mjs:90-91`).
-- The default view prints a count line, one row per task, then the overlaps among ready tasks or a line saying there are none (`lib/plan.mjs:97-105`).
+- Flags: `--json` for the same data as JSON, `--check <TASK-ID>` to validate a brief, `--dispatchable` for the ids that could be dispatched now, and `--overlapping <ID>` for the unmerged tasks whose owned paths overlap that task's, one id per line (`lib/plan.mjs:5-9`, `lib/plan.mjs:17-21`, `lib/plan.mjs:97-109`).
+- It exits 2 when the plan file is missing (`lib/plan.mjs:28`).
+- `--check` exits 1 with one line per problem, or 0 with "ok" (`lib/plan.mjs:94-95`).
+- The default view prints a count line, one row per task, then the overlaps among ready tasks or a line saying there are none (`lib/plan.mjs:114-122`).
 
 ### `skein brief`
 
@@ -83,25 +83,25 @@ detected by the absence of a sibling `commands/` directory (`bin/skein:8-18`).
 - `--new` refuses when the file already exists (`commands/brief.sh:15`).
 - Any other mode is refused with "unknown mode" (`commands/brief.sh:20`).
 - A missing task id is refused with the usage line (`commands/brief.sh:9`).
-- The validator requires a title, the sections `Objective`, `Read first`, `You own`, `Work` and `Acceptance`, every owned glob listed under "You own", at least one accept command, at least one owned glob, the task id somewhere in the text, and a non-null `brief` path in the plan (`lib/plan.mjs:80-87`).
+- The validator requires a title, the sections `Objective`, `Read first`, `You own`, `Work` and `Acceptance`, every owned glob listed under "You own", at least one accept command, at least one owned glob, the task id somewhere in the text, and a non-null `brief` path in the plan (`lib/plan.mjs:84-91`).
 
 ### `skein dispatch`
 
 - Claims the task on the board, creates the workspace, waits for setup and launches the worker (`commands/dispatch.sh:3`).
-- Flags: `--tag <t>` (default `running`), `--model <m>`, `--agent <a>`, `--effort <e>`; a bare argument is the task id (`commands/dispatch.sh:9-12`).
-- Any other flag is refused with "unknown flag", and a missing task id with the usage line (`commands/dispatch.sh:12-13`).
-- Unset flags fall back to `worker.agent` (default `claude`), `worker.model` and `worker.effort` from the config (`commands/dispatch.sh:17-19`).
-- It prints one JSON line on success: `task`, `ok`, `workspace`, `terminal`, `branch`, `head`, `model`, `worktree`, `board` (`commands/dispatch.sh:85-87`).
-- On any failure it prints `{task, ok:false, error}` and exits 1, after releasing the claim back to `ready` and deleting a half-built workspace (`commands/dispatch.sh:26-30`).
-- It refuses when the brief does not validate, quoting the validator's reasons (`commands/dispatch.sh:34`).
-- It refuses when the task is not dispatchable because a dependency is not merged (`commands/dispatch.sh:35`).
-- It refuses when the brief or the plan differs from the base reference, because workspaces fork from there (`commands/dispatch.sh:38-39`).
-- A leftover branch with no commits of its own is deleted so the workspace forks from today's base; a branch with commits on it is a refusal (`commands/dispatch.sh:44-54`).
-- It refuses when either cap is reached, and refuses again after claiming if the repository is over its cap, releasing the claim (`commands/dispatch.sh:57`, `commands/dispatch.sh:63`).
-- It refuses when workspace creation fails, when setup fails, when the worktree cannot be found, when the brief is missing inside the worktree, and when the workspace head is not the base reference (`commands/dispatch.sh:66-73`).
-- It refuses when the agent does not start (`commands/dispatch.sh:83`).
-- The worker prompt is fixed unless `workerPrompt` overrides it, with a separate default for local mode; the placeholders substituted are `{ID}`, `{NAME}`, `{BRIEF}`, `{GATE}` and `{BASE}` (`commands/dispatch.sh:76-81`).
-- It comments on the board naming the workspace, branch, agent, model and head (`commands/dispatch.sh:84`).
+- Flags: `--tag <t>` (default `running`), `--model <m>`, `--agent <a>`, `--effort <e>`, `--allow-overlap`; a bare argument is the task id (`commands/dispatch.sh:9-13`).
+- Any other flag is refused with "unknown flag", a second task id with "one task per call", and a missing task id with the usage line (`commands/dispatch.sh:13-14`).
+- Unset flags fall back to `worker.agent` (default `claude`), `worker.model` and `worker.effort` from the config (`commands/dispatch.sh:18-20`).
+- It prints one JSON line on success: `task`, `ok`, `workspace`, `terminal`, `branch`, `head`, `model`, `worktree`, `board` (`commands/dispatch.sh:95-97`).
+- On any failure it prints `{task, ok:false, error}` and exits 1, after releasing the claim back to `ready` and deleting a half-built workspace (`commands/dispatch.sh:27-31`).
+- It refuses when the brief does not validate, quoting the validator's reasons (`commands/dispatch.sh:35`).
+- It refuses when the task is not dispatchable because a dependency is not merged, and when the brief or the plan differs from the base reference, because workspaces fork from there (`commands/dispatch.sh:36`, `commands/dispatch.sh:39-40`).
+- It refuses a task whose owned paths overlap a task in flight, claimed on the board or holding a workspace here, unless `--allow-overlap` is passed; the check runs once, before the claim (`commands/dispatch.sh:42-49`).
+- A leftover branch with no commits of its own is deleted so the workspace forks from today's base; a branch with commits on it is a refusal (`commands/dispatch.sh:54-64`).
+- It refuses when either cap is reached, and refuses again after claiming if the repository is over its cap, releasing the claim (`commands/dispatch.sh:67`, `commands/dispatch.sh:73`).
+- It refuses when workspace creation fails, when setup fails, when the worktree cannot be found, when the brief is missing inside the worktree, and when the workspace head is not the base reference (`commands/dispatch.sh:76-83`).
+- It refuses when the agent does not start (`commands/dispatch.sh:93`).
+- The worker prompt is fixed unless `workerPrompt` overrides it, with a separate default for local mode; the placeholders substituted are `{ID}`, `{NAME}`, `{BRIEF}`, `{GATE}` and `{BASE}` (`commands/dispatch.sh:86-91`).
+- It comments on the board naming the workspace, branch, agent, model and head (`commands/dispatch.sh:94`).
 
 ### `skein watch`
 
@@ -120,12 +120,12 @@ detected by the absence of a sibling `commands/` directory (`bin/skein:8-18`).
 
 ### `skein status`
 
-- Every task running anywhere according to the board, and every worker running here according to the driver, with both caps (`commands/status.sh:2-3`).
+- Every task running anywhere according to the board, and every worker running here according to the driver, with both caps; of the driver's workspaces only those named for a task in the plan are listed, and the others are counted on a closing line saying they carry no task id (`commands/status.sh:2-3`, `commands/status.sh:14-31`, `commands/status.sh:38-39`, `commands/status.sh:63`).
 - Read-only: it never sends anything to a worker (`commands/status.sh:3`).
-- Takes no flags (`commands/status.sh:1-41`).
-- Per workspace it prints a state read from the terminal text: DONE awaiting gate, BLOCKED, usage limit, API retry, working, idle at prompt, or no agent (`commands/status.sh:21-29`).
-- It also prints the commit count against the base branch, the uncommitted file count, the worktree path and the agent's last note (`commands/status.sh:30-39`).
-- It closes with a line saying the gate, not this view, decides done (`commands/status.sh:41`).
+- Takes no flags (`commands/status.sh:1-64`).
+- Per workspace it prints a state read from the terminal text: DONE awaiting gate, BLOCKED, usage limit, API retry, working, idle at prompt, or no agent (`commands/status.sh:42-50`).
+- It also prints the commit count against the base branch, the uncommitted file count, the worktree path and the agent's last note (`commands/status.sh:51-60`).
+- It closes with a line saying the gate, not this view, decides done (`commands/status.sh:64`).
 
 ### `skein send`
 
@@ -141,19 +141,19 @@ detected by the absence of a sibling `commands/` directory (`bin/skein:8-18`).
 - It passes every argument through to `lib/gate.mjs` (`commands/gate.sh:3`).
 - Flags: `--base <ref>`, `--only <check>[,<check>]`, `--timeout-min <n>` (default 30), `--from-branch` and `--standard-only` (`lib/gate.mjs:7-9`, `lib/gate.mjs:28`, `lib/gate.mjs:32`).
 - A value flag with no value, an unknown flag, a second positional argument, an unknown check name, or a non-positive timeout each exit 2 (`lib/gate.mjs:39-51`).
-- `--standard-only` runs the config's `standard` commands with no task at all, and is what CI runs on a push to the base branch (`lib/gate.mjs:9`, `lib/gate.mjs:87-99`).
-- `--from-branch` resolves the task from `GITHUB_HEAD_REF`, then `SKEIN_BRANCH`, then the checked-out branch, matching the last path segment against task ids (`lib/gate.mjs:104-115`).
-- A branch that names no task runs the standard commands instead of failing, which is how a coordinator's own pull request passes (`lib/gate.mjs:112-113`).
-- Without a task id and without `--from-branch` it exits 2 (`lib/gate.mjs:117`).
-- It exits 2 when the config file is missing, when the plan file is missing, and when the task is not in the plan (`lib/gate.mjs:85`, `lib/gate.mjs:101`, `lib/gate.mjs:119`).
-- The default base is `origin/main` when that reference verifies, otherwise `main` (`lib/gate.mjs:121`).
-- It exits 1 when any check failed, 0 otherwise (`lib/gate.mjs:288`).
+- `--standard-only` runs the config's `standard` commands with no task at all, and is what CI runs on a push to the base branch (`lib/gate.mjs:9`, `lib/gate.mjs:100-112`).
+- `--from-branch` resolves the task from `GITHUB_HEAD_REF`, then `SKEIN_BRANCH`, then the checked-out branch, matching the last path segment against task ids (`lib/gate.mjs:117-128`).
+- A branch that names no task runs the standard commands instead of failing, which is how a coordinator's own pull request passes (`lib/gate.mjs:125-126`).
+- Without a task id and without `--from-branch` it exits 2 (`lib/gate.mjs:130`).
+- It exits 2 when the config file is missing, when the plan file is missing, and when the task is not in the plan (`lib/gate.mjs:85`, `lib/gate.mjs:114`, `lib/gate.mjs:132`).
+- The default base is `origin/<baseBranch>` when that reference verifies, and `<baseBranch>` otherwise, with `baseBranch` defaulting to `main` (`lib/gate.mjs:134-135`).
+- It exits 1 when any check failed, 0 otherwise (`lib/gate.mjs:302`).
 
 ### `skein review`
 
 - Cross-model review of the task's pull request in a read-only worktree forked from the pull request branch, headless (`commands/review.sh:2-4`).
 - Flags: `--agent codex|claude` and `--model <m>`; a bare argument is the task id (`commands/review.sh:2`, `commands/review.sh:11-12`).
-- Any other flag is refused with "unknown flag", and a missing task id with the usage line (`commands/review.sh:12-13`).
+- Any other flag is refused with "unknown flag", a second task id with "one task per call", and a missing task id with the usage line (`commands/review.sh:12-13`).
 - Unset flags fall back to `review.agent` (default `codex`) and `review.model` (`commands/review.sh:15-16`).
 - When the agent is `codex` and `codex --version` does not run, it warns and falls back to `claude` with `review.fallbackModel` (default `claude-fable-5-1`) (`commands/review.sh:18-20`).
 - An agent other than `codex` or `claude` is refused with "unknown review agent" (`commands/review.sh:52`).
@@ -170,7 +170,7 @@ detected by the absence of a sibling `commands/` directory (`bin/skein:8-18`).
 
 - Reruns the gate in the worker's worktree, squash-merges, closes the claim, deletes the workspace and then the branch, and marks the task done in the plan with a log line (`commands/merge.sh:3-5`).
 - Flags: `--no-gate`; a bare argument is the task id (`commands/merge.sh:2`, `commands/merge.sh:13`).
-- Any other flag is refused with "unknown flag", and a missing task id with the usage line (`commands/merge.sh:13-14`).
+- Any other flag is refused with "unknown flag", a second task id with "one task per call", and a missing task id with the usage line (`commands/merge.sh:13-14`).
 - It refuses a task claimed by someone else (`commands/merge.sh:19`).
 - It refuses a `money` or `pii` task without the review marker: a comment from a repository owner, member or collaborator outside local mode, or the review file in local mode (`commands/merge.sh:26-27`, `commands/merge.sh:32-36`).
 - `--no-gate` is honoured only when a CI check whose name matches "gate" succeeded on the pull request, and is refused outright in local mode (`commands/merge.sh:23`, `commands/merge.sh:40-43`).
@@ -185,54 +185,54 @@ detected by the absence of a sibling `commands/` directory (`bin/skein:8-18`).
 
 ## Gate
 
-Nine checks in this order (`lib/gate.mjs:27`, `lib/gate.mjs:276-285`). Each prints a `[PASS]`,
+Nine checks in this order (`lib/gate.mjs:27`, `lib/gate.mjs:290-299`). Each prints a `[PASS]`,
 `[FAIL]` or `[SKIP]` line with up to 40 notes (`lib/gate.mjs:73-78`).
 
 | check | what it checks | what makes it fail | source |
 |---|---|---|---|
-| `brief` | the task has a brief and the file exists | `brief` is null in the plan, or the path does not exist | `lib/gate.mjs:145-150` |
-| `clean-tree` | the working tree has no uncommitted changes | any output from the porcelain status | `lib/gate.mjs:151-155` |
-| `boundary` | every changed file is the task's to change | a coordinator-owned path in a non-coordinator task, or a path outside the task's `owned` globs and the plan's `alwaysAllowed` | `lib/gate.mjs:156-169` |
-| `secrets` | no credential reached a commit | a forbidden filename, a line matching a key pattern, or a 32-byte hex value on a line naming a key or secret | `lib/gate.mjs:196-210` |
-| `test-integrity` | no test was weakened, no shared suite shrank | an added line carrying a weakener token, or a monotonic count that fell | `lib/gate.mjs:220-232` |
-| `invariants` | the repository's own "never do this" rules | an added line matching a rule's `pattern`, outside the rule's `except` globs and outside comments | `lib/gate.mjs:234-248` |
-| `standard` | the config's `standard` commands | any command exiting non-zero, or no commands configured at all | `lib/gate.mjs:259-263` |
-| `e2e` | the config's `e2e` commands | any command exiting non-zero; an empty list passes | `lib/gate.mjs:264-268` |
-| `accept` | the task's own `accept` commands | any command exiting non-zero, or no accept commands in the plan | `lib/gate.mjs:269-273` |
+| `brief` | the task has a brief and the file exists | `brief` is null in the plan, or the path does not exist | `lib/gate.mjs:159-164` |
+| `clean-tree` | the working tree has no uncommitted changes | any output from the porcelain status | `lib/gate.mjs:165-169` |
+| `boundary` | every changed file is the task's to change | a coordinator-owned path in a non-coordinator task, or a path outside the task's `owned` globs and the plan's `alwaysAllowed` | `lib/gate.mjs:170-183` |
+| `secrets` | no credential reached a commit | a forbidden filename, a line matching a key pattern, or a 32-byte hex value on a line naming a key or secret | `lib/gate.mjs:210-224` |
+| `test-integrity` | no test was weakened, no shared suite shrank | an added line carrying a weakener token, or a monotonic count that fell | `lib/gate.mjs:234-246` |
+| `invariants` | the repository's own "never do this" rules | an added line matching a rule's `pattern`, outside the rule's `except` globs and outside comments | `lib/gate.mjs:248-262` |
+| `standard` | the config's `standard` commands | any command exiting non-zero, or no commands configured at all | `lib/gate.mjs:273-277` |
+| `e2e` | the config's `e2e` commands | any command exiting non-zero; an empty list passes | `lib/gate.mjs:278-282` |
+| `accept` | the task's own `accept` commands | any command exiting non-zero, or no accept commands in the plan | `lib/gate.mjs:283-287` |
 
-- Monotonic counts sit inside `test-integrity`, not in a check of their own: for each `monotonic` entry whose file changed, the count of the pattern in the file may not fall below its count at the base (`lib/gate.mjs:223-229`).
-- `secrets` and `test-integrity` and `invariants` read added lines only, so a rule is about what this branch wrote (`lib/gate.mjs:132-141`).
-- The secret patterns are described by kind rather than typed out: Stripe or Clerk secret keys, Stripe restricted keys, Stripe live publishable keys, Stripe webhook signing secrets, Resend API keys, Anthropic API keys, OpenAI API keys, GitHub tokens, AWS access key ids, Slack tokens, and a PEM private-key header, plus any pair added in `secretPatterns` (`lib/gate.mjs:171-184`).
-- `secrets` also fails a line that names a key, signer, secret or mnemonic and carries a 64-character hex value, unless that value is one of three published development accounts or is listed in `secretAllow` (`lib/gate.mjs:186-194`, `lib/gate.mjs:202-204`).
-- Committing an environment file or an SSH private key by name fails the check whatever the contents (`lib/gate.mjs:194`, `lib/gate.mjs:198`).
-- The weakener tokens are likewise described rather than typed: a focused or skipped test call in either the dotted or the prefixed form, the TypeScript pragma that switches off checking for a whole file, the pragma that suppresses the next error without failing when it goes away, a file-wide lint disable comment, Rust's ignore attribute, and Python's two skip markers (`lib/gate.mjs:212-219`).
-- Because those are literal token searches over every added line of every file, prose that spells one out fails the check as surely as code does (`lib/gate.mjs:212-222`).
-- Once an earlier check fails, `standard`, `e2e` and `accept` are recorded as `SKIP` rather than run, unless `--only` was passed (`lib/gate.mjs:282-285`).
-- `--only` therefore also turns the skipping off, which is what makes a fast static pass usable on its own (`lib/gate.mjs:283-285`).
-- Each `standard`, `e2e` and `accept` command runs through the shell with the gate's timeout, and the first failure stops that check's list (`lib/gate.mjs:250-258`).
+- Monotonic counts sit inside `test-integrity`, not in a check of their own: for each `monotonic` entry whose file changed, the count of the pattern in the file may not fall below its count at the base (`lib/gate.mjs:237-243`).
+- `secrets` and `test-integrity` and `invariants` read added lines only, so a rule is about what this branch wrote (`lib/gate.mjs:146-155`).
+- The secret patterns are described by kind rather than typed out: Stripe or Clerk secret keys, Stripe restricted keys, Stripe live publishable keys, Stripe webhook signing secrets, Resend API keys, Anthropic API keys, OpenAI API keys, GitHub tokens, AWS access key ids, Slack tokens, and a PEM private-key header, plus any pair added in `secretPatterns` (`lib/gate.mjs:185-198`).
+- `secrets` also fails a line that names a key, signer, secret or mnemonic and carries a 64-character hex value, unless that value is one of three published development accounts or is listed in `secretAllow` (`lib/gate.mjs:200-208`, `lib/gate.mjs:216-218`).
+- Committing an environment file or an SSH private key by name fails the check whatever the contents (`lib/gate.mjs:208`, `lib/gate.mjs:212`).
+- The weakener tokens are likewise described rather than typed: a focused or skipped test call in either the dotted or the prefixed form, the TypeScript pragma that switches off checking for a whole file, the pragma that suppresses the next error without failing when it goes away, a file-wide lint disable comment, Rust's ignore attribute, and Python's two skip markers (`lib/gate.mjs:226-233`).
+- Because those are literal token searches over every added line of every file, prose that spells one out fails the check as surely as code does (`lib/gate.mjs:226-236`).
+- Once an earlier check fails, `standard`, `e2e` and `accept` are recorded as `SKIP` rather than run, unless `--only` was passed (`lib/gate.mjs:296-299`).
+- `--only` therefore also turns the skipping off, which is what makes a fast static pass usable on its own (`lib/gate.mjs:297-299`).
+- Each `standard`, `e2e` and `accept` command runs through the shell with the gate's timeout, and the first failure stops that check's list (`lib/gate.mjs:264-272`).
 - CI runs a subset: on a pull request `--from-branch --only brief,boundary,secrets,test-integrity,invariants,standard,accept`, which leaves out `clean-tree` and `e2e`; on a push to the base branch, `--standard-only` (`templates/ci.yml.tmpl:27-32`).
-- The gate's last line is `SKEIN_GATE_RESULT task=<id> base=<ref> status=PASS|FAIL checks=<name>:<status>,...`, one entry per check that ran (`lib/gate.mjs:287`).
-- Under `--standard-only` that line carries `task=-` and a single `standard` entry, and no base (`lib/gate.mjs:96`).
+- The gate's last line is `SKEIN_GATE_RESULT task=<id> base=<ref> status=PASS|FAIL checks=<name>:<status>,...`, one entry per check that ran (`lib/gate.mjs:301`).
+- Under `--standard-only` that line carries `task=-` and a single `standard` entry, and no base (`lib/gate.mjs:109`).
 - The gate is vendored into each repository and coordinator-owned there, so a worker cannot weaken the gate it is judged by (`lib/gate.mjs:2-5`).
 - It is dependency-free on purpose: it runs on whatever `node` is on `PATH`, before any install (`lib/gate.mjs:5`).
 
 ## Plan
 
-The plan file is `docs/plan/wps.json` by default (`lib/plan.mjs:24`).
+The plan file is `docs/plan/wps.json` by default (`lib/plan.mjs:26`).
 
-- Task fields the code reads: `id`, `title`, `type`, `slug`, `brief`, `owned`, `deps`, `accept`, `money`, `pii`, `done` and `coordinator` (`lib/plan.mjs:52-62`, `lib/gate.mjs:146-160`, `lib/gate.mjs:270`, `lib/common.sh:66-75`, `commands/merge.sh:21`, `commands/merge.sh:56`).
-- `id` is matched case-insensitively everywhere, and the plan's spelling is canonical (`lib/common.sh:58`, `lib/common.sh:63`, `lib/gate.mjs:118-120`).
-- `type` and `slug` give the branch name `<type>/<slug>-<id>` with the id lowercased, and the workspace name `<type>: <slug words> (<ID>)`; without both, the branch and the workspace are named after the id alone (`lib/common.sh:65-75`).
+- Task fields the code reads: `id`, `title`, `type`, `slug`, `brief`, `owned`, `deps`, `accept`, `money`, `pii`, `done` and `coordinator` (`lib/plan.mjs:56-66`, `lib/gate.mjs:160-174`, `lib/gate.mjs:284`, `lib/common.sh:80-89`, `commands/merge.sh:21`, `commands/merge.sh:56`).
+- `id` is matched case-insensitively everywhere, and the plan's spelling is canonical (`lib/common.sh:72`, `lib/common.sh:77`, `lib/gate.mjs:131-133`).
+- `type` and `slug` give the branch name `<type>/<slug>-<id>` with the id lowercased, and the workspace name `<type>: <slug words> (<ID>)`; without both, the branch and the workspace are named after the id alone (`lib/common.sh:79-89`).
 - `owned` is a list of globs; `**` crosses directories, `*` stops at a slash and `?` matches one non-slash character (`lib/gate.mjs:59-71`).
-- `coordinator: true` exempts a task from the coordinator-owned paths, and nothing else (`lib/gate.mjs:160-163`).
-- Plan-level `coordinatorOwned` always wins over a task's `owned` globs, and plan-level `alwaysAllowed` is permitted to every task (`lib/gate.mjs:158-164`).
-- The four statuses are `merged`, `no brief`, `waiting on deps` and `ready`, in that order of precedence (`lib/plan.mjs:61`).
-- `ready` means not merged, a `brief` path that exists on disk, and every dependency merged (`lib/plan.mjs:58-61`).
-- A task counts as merged when the plan says `done: true`, which `skein merge` sets, or when a commit subject in the last 1000 on the main reference ends with `(<ID>)`, optionally followed by a pull request number (`lib/plan.mjs:49-56`).
-- The main reference is `origin/main` when an origin remote exists, after a fetch, and the local `main` otherwise (`lib/plan.mjs:48`).
-- The overlap rule is deliberately conservative: two globs overlap when one's literal prefix up to its first wildcard contains the other's, and two wildcard-free globs overlap only when they are equal (`lib/plan.mjs:38-45`).
-- Overlaps are computed among ready tasks only, pairwise, and reported as the shared globs (`lib/plan.mjs:64-69`).
-- The reason for the conservatism is stated in the code: a false overlap costs one serialized merge round, a missed one costs a conflict (`lib/plan.mjs:38-39`).
+- `coordinator: true` exempts a task from the coordinator-owned paths, and nothing else (`lib/gate.mjs:174-177`).
+- Plan-level `coordinatorOwned` always wins over a task's `owned` globs, and plan-level `alwaysAllowed` is permitted to every task (`lib/gate.mjs:172-178`).
+- The four statuses are `merged`, `no brief`, `waiting on deps` and `ready`, in that order of precedence (`lib/plan.mjs:65`).
+- `ready` means not merged, a `brief` path that exists on disk, and every dependency merged (`lib/plan.mjs:62-65`).
+- A task counts as merged when the plan says `done: true`, which `skein merge` sets, or when a commit subject in the last 1000 on the base reference ends with `(<ID>)`, optionally followed by a pull request number (`lib/plan.mjs:53-60`).
+- The base reference follows the config's `baseBranch`, which defaults to `main`: `origin/<baseBranch>` when an origin remote exists, after a fetch, and the local `<baseBranch>` otherwise (`lib/plan.mjs:49-52`).
+- The overlap rule is deliberately conservative: two globs overlap when one's literal prefix up to its first wildcard contains the other's, and two wildcard-free globs overlap only when they are equal (`lib/plan.mjs:40-47`).
+- Overlaps are computed among ready tasks only, pairwise, and reported as the shared globs (`lib/plan.mjs:68-73`).
+- The reason for the conservatism is stated in the code: a false overlap costs one serialized merge round, a missed one costs a conflict (`lib/plan.mjs:40-41`).
 
 ## Config
 
@@ -241,48 +241,48 @@ the line given; a default of "none" means the code reads it only when it is pres
 
 | key | default | read at |
 |---|---|---|
-| `version` | `1` as written | written at `commands/init.sh:73`; no command reads it |
-| `name` | the repository directory name | `commands/status.sh:6`, `commands/dispatch.sh:80`, `commands/doctor.sh:9` |
-| `prefix` | `TASK` | `lib/common.sh:40` |
-| `mode` | none | `lib/common.sh:46` |
-| `envelope` | `<prefix>_WORKER` | `lib/common.sh:41` |
-| `coordinatorEnv` | `<prefix>_COORDINATOR` | `lib/common.sh:51` |
-| `plan` | `docs/plan/wps.json` | `lib/common.sh:38`, `lib/plan.mjs:24`, `lib/gate.mjs:100` |
-| `briefs` | `docs/plan/briefs` | `lib/common.sh:39`, `lib/plan.mjs:25`, `lib/gate.mjs:146` |
+| `version` | `1` as written | written at `commands/init.sh:97`; `require_config` and the gate refuse a config whose version is above the one this kit reads, and one that is not a whole number, saying "this kit understands version 1" (`lib/common.sh:22-35`, `lib/gate.mjs:89-99`); `skein doctor` reports the version and flags the same fault (`commands/doctor.sh:9-10`) |
+| `name` | the repository directory name | `commands/status.sh:6`, `commands/dispatch.sh:90`, `commands/doctor.sh:9` |
+| `prefix` | `TASK` | `lib/common.sh:54` |
+| `mode` | none | `lib/common.sh:60` |
+| `envelope` | `<prefix>_WORKER` | `lib/common.sh:55` |
+| `coordinatorEnv` | `<prefix>_COORDINATOR` | `lib/common.sh:65` |
+| `plan` | `docs/plan/wps.json` | `lib/common.sh:52`, `lib/plan.mjs:26`, `lib/gate.mjs:113` |
+| `briefs` | `docs/plan/briefs` | `lib/common.sh:53`, `lib/plan.mjs:27`, `lib/gate.mjs:160` |
 | `reviews` | `docs/plan/reviews` | `commands/review.sh:59`, `commands/merge.sh:25` |
-| `vendor` | `scripts/skein` | `commands/upgrade.sh:7`, `commands/merge.sh:16`, `commands/merge.sh:47`, `commands/doctor.sh:11` |
-| `gate` | `scripts/skein/skein gate` | `commands/dispatch.sh:20`, `commands/brief.sh:18` |
-| `baseBranch` | `main` | `commands/dispatch.sh:21`, `commands/merge.sh:16`, `commands/upgrade.sh:16`, `commands/status.sh:34` |
-| `board` | `{type, repo}`; type `github`, or `none` in local mode | `lib/common.sh:49`, `lib/boards/github.sh:16` |
-| `driver` | `{type}`; type `superset` | `lib/common.sh:50` |
+| `vendor` | `scripts/skein` | `commands/upgrade.sh:7`, `commands/merge.sh:16`, `commands/merge.sh:47`, `commands/doctor.sh:12` |
+| `gate` | `scripts/skein/skein gate` | `commands/dispatch.sh:21`, `commands/brief.sh:18` |
+| `baseBranch` | `main` | `commands/dispatch.sh:22`, `commands/merge.sh:16`, `commands/upgrade.sh:16`, `commands/status.sh:55`, `lib/gate.mjs:134`, `lib/plan.mjs:51` |
+| `board` | `{type, repo}`; type `github`, or `none` in local mode | `lib/common.sh:63`, `lib/boards/github.sh:16` |
+| `driver` | `{type}`; type `superset` | `lib/common.sh:64` |
 | `maxAgents` | `6` | `lib/caps.sh:8` |
-| `install` | `true` as written | written at `commands/init.sh:76`; rendered into CI and the setup script at init time (`commands/init.sh:108`, `templates/ci.yml.tmpl:26`) |
-| `standard` | empty, which fails the check | `lib/gate.mjs:88`, `lib/gate.mjs:260`, `commands/doctor.sh:30` |
-| `e2e` | empty, which passes | `lib/gate.mjs:265` |
-| `invariants` | empty, which passes | `lib/gate.mjs:235` |
-| `monotonic` | empty | `lib/gate.mjs:223` |
-| `secretPatterns` | empty | `lib/gate.mjs:183` |
-| `secretAllow` | empty | `lib/gate.mjs:190` |
-| `worker` | `{agent: claude, model, effort}` | `commands/dispatch.sh:17-19` |
-| `review` | `{agent: codex, model, fallbackModel}` | `commands/review.sh:15-16`, `commands/review.sh:19`, `commands/doctor.sh:28` |
-| `workerPrompt` | none; the built-in prompt is used | `commands/dispatch.sh:76`, `commands/dispatch.sh:79` |
+| `install` | `true` as written | written at `commands/init.sh:100`; rendered into CI and the setup script at init time (`commands/init.sh:132`, `templates/ci.yml.tmpl:26`) |
+| `standard` | empty, which fails the check | `lib/gate.mjs:101`, `lib/gate.mjs:274`, `commands/doctor.sh:31` |
+| `e2e` | empty, which passes | `lib/gate.mjs:279` |
+| `invariants` | empty, which passes | `lib/gate.mjs:249` |
+| `monotonic` | empty | `lib/gate.mjs:237` |
+| `secretPatterns` | empty | `lib/gate.mjs:197` |
+| `secretAllow` | empty | `lib/gate.mjs:204` |
+| `worker` | `{agent: claude, model, effort}` | `commands/dispatch.sh:18-20` |
+| `review` | `{agent: codex, model, fallbackModel}` | `commands/review.sh:15-16`, `commands/review.sh:19`, `commands/doctor.sh:29` |
+| `workerPrompt` | none; the built-in prompt is used | `commands/dispatch.sh:86`, `commands/dispatch.sh:89` |
 | `readyMarker` | `workspace '.*' ready` | `lib/drivers/superset.sh:26`, `lib/drivers/local.sh:12` |
 | `setupScript` | `.superset/setup.sh` | `lib/drivers/local.sh:14` |
-| `setupTimeout` | `300` | `commands/dispatch.sh:68`, `commands/review.sh:34` |
+| `setupTimeout` | `300` | `commands/dispatch.sh:78`, `commands/review.sh:34` |
 | `setupFatal` | a pattern covering package manager and TypeScript errors | `lib/drivers/superset.sh:27`, `lib/drivers/local.sh:13` |
 
-- Values are read one at a time with `jq`, and an empty or missing value falls back to the default passed at the call site (`lib/common.sh:23-29`).
+- Values are read one at a time with `jq`, and an empty or missing value falls back to the default passed at the call site (`lib/common.sh:37-43`).
 - `~/.skein/config.json` is the per-machine config, and holds `maxAgents` (default 3) and `projects`, a map from a checkout path to `{supersetProjectId}` (`lib/caps.sh:7`, `lib/drivers/superset.sh:42`).
 - `SKEIN_MAX_AGENTS` overrides the machine cap (`lib/caps.sh:7`).
 - `SKEIN_PROJECT_ID` overrides the resolved Superset project id (`lib/drivers/superset.sh:40`).
-- `SKEIN_DRIVER` overrides `driver.type`, for a machine without Superset (`lib/common.sh:50`).
-- `SKEIN_BOARD` overrides `board.type` (`lib/common.sh:49`).
+- `SKEIN_DRIVER` overrides `driver.type`, for a machine without Superset (`lib/common.sh:64`).
+- `SKEIN_BOARD` overrides `board.type` (`lib/common.sh:63`).
 - `SKEIN_USER_CONFIG` overrides the path of the per-machine config (`lib/common.sh:18`).
 - `SKEIN_WORKTREES` overrides where the local driver keeps worktrees, default `~/.skein/worktrees` (`lib/drivers/local.sh:10`).
 - `SKEIN_RUNS` overrides where the local driver keeps run logs, default `~/.skein/runs` (`lib/drivers/local.sh:11`).
 - `SKEIN_STATE_DIR` overrides where `skein watch` keeps its log, snapshot and baseline (`commands/watch.sh:15`).
 - `SKEIN_KIT_GIT` tells `skein upgrade` not to pull the kit checkout (`commands/upgrade.sh:9`).
-- Three more are read and are not in the README: `SKEIN_BRANCH`, a fallback branch name for the gate's `--from-branch` (`lib/gate.mjs:107`), and `SKEIN_BIN_DIR` with `CLAUDE_SKILLS_DIR` for the installer's destinations (`setup:7-8`).
+- Three more are read and are not in the README: `SKEIN_BRANCH`, a fallback branch name for the gate's `--from-branch` (`lib/gate.mjs:120`), and `SKEIN_BIN_DIR` with `CLAUDE_SKILLS_DIR` for the installer's destinations (`setup:7-8`).
 - The coordinator environment variable named by `coordinatorEnv` is what lets a push to the base branch through the pre-push hook; it is a guard, not a permission system, because anyone can set it (`templates/pre-push.tmpl:8-10`, `templates/pre-push.tmpl:14`).
 
 ## Boards and drivers
@@ -290,7 +290,7 @@ the line given; a default of "none" means the code reads it only when it is pres
 Every board implements `board_claim`, `board_release`, `board_close`, `board_owner`,
 `board_running_count`, `board_list` and `board_comment`, and the type names the file under
 `lib/boards/` that is sourced; an unknown type is a refusal (`lib/boards/github.sh:6-13`,
-`lib/common.sh:78`).
+`lib/common.sh:92`).
 
 - **GitHub** is the default outside local mode: one issue per task titled `<ID>: <title>`, labelled `skein`, with the state in a `state:` label (`lib/boards/github.sh:2-4`).
 - Assigning yourself is the claim, and an unassigned issue is free (`lib/boards/github.sh:2-3`).
@@ -333,7 +333,7 @@ Every driver implements `driver_project_id`, `driver_create`, `driver_wait_setup
 - The repository cap is `maxAgents` in the repository config, else 6 (`lib/caps.sh:8`).
 - The local count comes from the driver and counts what this machine runs for this repository; the board count comes from the board and counts claims running anywhere (`lib/caps.sh:10-11`).
 - A dispatch must fit under both, and the check prints its reason on stdout either way (`lib/caps.sh:5`, `lib/caps.sh:12-23`).
-- Because two coordinators can pass the check together, `skein dispatch` recounts after claiming and releases the claim if the repository is over its cap (`commands/dispatch.sh:61-63`).
+- Because two coordinators can pass the check together, `skein dispatch` recounts after claiming and releases the claim if the repository is over its cap (`commands/dispatch.sh:71-73`).
 
 ## Review
 
@@ -347,17 +347,17 @@ Every driver implements `driver_project_id`, `driver_create`, `driver_wait_setup
 
 ## Local mode
 
-- Local mode is on when the config says `"mode": "local"` or when the repository has no origin remote (`lib/common.sh:42-46`).
-- In local mode nothing is pushed, there are no pull requests, workspaces fork from the local base branch, and `skein merge` squash-merges locally (`lib/common.sh:42-44`).
-- Base references drop the `origin/` prefix and fetches become no-ops (`lib/common.sh:47-48`).
-- The board defaults to `none` rather than `github` (`lib/common.sh:49`).
-- `skein init` sets `"mode": "local"`, defaults the board to `none`, refuses `--board github`, and writes no CI workflow (`commands/init.sh:20-22`, `commands/init.sh:80`, `commands/init.sh:121-122`).
-- The worker prompt tells the worker to leave everything committed on its branch and open no pull request (`commands/dispatch.sh:78-79`).
-- `skein dispatch` says to commit the brief and the plan on the base branch first, because the workspace forks from it (`commands/dispatch.sh:37`).
+- Local mode is on when the config says `"mode": "local"` or when the repository has no origin remote (`lib/common.sh:56-60`).
+- In local mode nothing is pushed, there are no pull requests, workspaces fork from the local base branch, and `skein merge` squash-merges locally (`lib/common.sh:56-58`).
+- Base references drop the `origin/` prefix and fetches become no-ops (`lib/common.sh:61-62`).
+- The board defaults to `none` rather than `github` (`lib/common.sh:63`).
+- `skein init` sets `"mode": "local"`, defaults the board to `none`, refuses `--board github`, and writes no CI workflow (`commands/init.sh:39-41`, `commands/init.sh:104`, `commands/init.sh:145-146`).
+- The worker prompt tells the worker to leave everything committed on its branch and open no pull request (`commands/dispatch.sh:88-89`).
+- `skein dispatch` says to commit the brief and the plan on the base branch first, because the workspace forks from it (`commands/dispatch.sh:38`).
 - `skein review` reviews the branch's diff against the base branch and writes its findings, with the marker, to the reviews directory (`commands/review.sh:6-7`, `commands/review.sh:58-60`).
 - `skein merge` refuses `--no-gate`, because the flag trusts a CI gate check and local mode has no CI (`commands/merge.sh:23`, commit 0b42055).
 - `skein merge` requires the base branch checked out and clean in the coordinator's checkout, squashes there, and pushes nothing (`commands/merge.sh:51-65`, `commands/merge.sh:83-87`).
-- `skein doctor` reports local mode instead of checking origin, and fails a `github` board (`commands/doctor.sh:13-16`).
+- `skein doctor` reports local mode instead of checking origin, and fails a `github` board (`commands/doctor.sh:14-17`).
 - To leave local mode, add a remote and drop the `mode` key (`commands/init.sh:4-5`).
 
 ## Skills
@@ -375,23 +375,14 @@ directory (`setup:13-15`).
 ## Drift
 
 Where the README or the usage text disagrees with the code, the code is what this file
-records. Each bullet cites both sides.
+records. Each bullet cites both sides. What the README used to get wrong went with the
+rewrite, so every bullet left is about the usage text built into `bin/skein`.
 
-- The usage text for `init` lists four flags and leaves out `--base` and `--force-templates` (`bin/skein:27` against `commands/init.sh:3`, `commands/init.sh:17`).
+- The usage text for `init` lists four flags and leaves out `--base` and `--force-templates` (`bin/skein:27` against `commands/init.sh:2-3`, `commands/init.sh:18-19`).
 - The usage text for `brief` shows only `--check` and leaves out `--new` (`bin/skein:34` against `commands/brief.sh:2-4`).
-- The usage text for `dispatch` leaves out `--effort` (`bin/skein:37` against `commands/dispatch.sh:2`, `commands/dispatch.sh:11`).
+- The usage text for `dispatch` leaves out `--effort` and `--allow-overlap` (`bin/skein:37` against `commands/dispatch.sh:2`, `commands/dispatch.sh:11-12`).
 - The usage text for `watch` lists four positional arguments; the code takes six, plus `--resume` (`bin/skein:39` against `commands/watch.sh:2`, `commands/watch.sh:9`).
 - The usage text for `gate` lists `--only` and `--base` and leaves out `--timeout-min`, `--from-branch` and `--standard-only` (`bin/skein:45` against `lib/gate.mjs:7-9`, `lib/gate.mjs:28`).
 - The usage text for `review` leaves out `--agent` and `--model` (`bin/skein:47` against `commands/review.sh:2`, `commands/review.sh:11-12`).
 - The usage text for `merge` leaves out `--no-gate` (`bin/skein:48` against `commands/merge.sh:2`, `commands/merge.sh:13`).
 - The usage text describes the per-machine config as holding `maxAgents`; the code also reads `projects` from it (`bin/skein:50` against `lib/drivers/superset.sh:42`).
-- The README's gate description lists the checks from `clean-tree` onwards and leaves out the `brief` check, which runs first (`README.md:14-18` against `lib/gate.mjs:27`).
-- The README says CI runs the gate on every pull request without saying it runs a subset, leaving out `clean-tree` and `e2e` (`README.md:17` against `templates/ci.yml.tmpl:27-32`).
-- The README's config table lists eleven rows and leaves out `version`, `envelope`, `coordinatorEnv`, `plan`, `briefs`, `reviews`, `vendor`, `gate`, `baseBranch`, `readyMarker`, `setupScript`, `setupTimeout` and `setupFatal` (`README.md:83-95` against `lib/common.sh:38-51` and the table above).
-- The README groups `install` with `standard` and `e2e` as "commands the gate runs"; the gate runs `standard` and `e2e` only, and `install` is consumed by `skein init` when it renders CI and the setup script (`README.md:90` against `lib/gate.mjs:260`, `lib/gate.mjs:265`, `commands/init.sh:108`).
-- The README lists four placeholders for `workerPrompt`; the code also substitutes `{BASE}` (`README.md:95` against `commands/dispatch.sh:81`).
-- The README names three environment overrides; the code reads nine, plus `SKEIN_BRANCH`, `SKEIN_BIN_DIR` and `CLAUDE_SKILLS_DIR` (`README.md:98-99` against `lib/common.sh:18`, `lib/drivers/local.sh:10-11`, `commands/watch.sh:15`, `commands/upgrade.sh:9`, `lib/gate.mjs:107`, `setup:7-8`).
-- The README says `skein upgrade` pulls the kit; the pull is skipped when `SKEIN_KIT_GIT` is set, and a failed pull is a warning rather than a stop (`README.md:115` against `commands/upgrade.sh:9`).
-- The README says the board default is GitHub issues without the local-mode exception, where it is `none` (`README.md:22` against `lib/common.sh:49`).
-- The README's install line requires `gh` flatly; the installer only notes a missing binary, and `gh` is needed for the GitHub board and for pushing work, not in local mode (`README.md:38` against `setup:18`, `commands/review.sh:9`, `commands/merge.sh:11`).
-- The gate's default base is `origin/main`, or `main`, regardless of the config's `baseBranch`, and so is the reference `skein plan` reads merges from; neither the README nor the usage text says so (`lib/gate.mjs:121`, `lib/plan.mjs:48` against `README.md:86-89`).
