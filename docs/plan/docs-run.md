@@ -121,6 +121,7 @@ The gate reads every added line of every file, prose included (AGENTS.md rule 17
 | SK-07 | Limitations page | `docs/limitations.md` | SK-01 | |
 | SK-06 | Demo recording | `docs/demo/**`, `docs/assets/demo.*` | SK-05 | |
 | SK-11 | Example init flags | `examples/hello-swarm/**` | SK-05, 06 | follow-up from SK-06; runs beside SK-04 |
+| SK-12 | Example dispatch line | `examples/hello-swarm/**` | SK-11 | follow-up from SK-09 |
 | SK-04 | README upgrade | `README.md` | SK-01, 02, 03, 05, 06, 07 | owner gate |
 | SK-09 | Fact-check review | `docs/plan/reviews/docs-factcheck.md` | as SK-04, plus SK-11 | reviews SK-04's branch |
 | SK-08 | Docs site (optional) | `docs/site/**`, `.github/workflows/pages.yml` | SK-04 | owner gate; briefed later |

@@ -282,7 +282,8 @@
         "SK-06",
         "SK-07",
         "SK-09",
-        "SK-11"
+        "SK-11",
+        "SK-12"
       ],
       "owned": [
         "docs/swarm-run.md"
@@ -318,6 +319,26 @@
       "brief": "docs/plan/briefs/SK-11.md",
       "notes": "Follow-up from SK-06: plain skein init in a mktemp -d sandbox renders AGENTS.md and the hook with a prefix derived from the folder name, not the config's HS. Runs beside SK-04 (disjoint files).",
       "done": true
+    },
+    {
+      "id": "SK-12",
+      "title": "Example: one task per skein dispatch",
+      "type": "docs",
+      "slug": "example-one-dispatch",
+      "deps": [
+        "SK-11"
+      ],
+      "owned": [
+        "examples/hello-swarm/**"
+      ],
+      "accept": [
+        "! grep -nE 'skein dispatch HS-[0-9]+ +HS-' examples/hello-swarm/README.md",
+        "grep -qF 'skein dispatch HS-01' examples/hello-swarm/README.md && grep -qF 'skein dispatch HS-02' examples/hello-swarm/README.md"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-12.md",
+      "notes": "Follow-up from SK-09: the example README passed two task ids to one skein dispatch, which dispatches only the last."
     }
   ]
 }
