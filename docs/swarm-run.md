@@ -7,6 +7,7 @@ reading. Times are UTC. The plan's own record is [docs/plan/LOG.md](plan/LOG.md)
 task's brief is in [docs/plan/briefs/](plan/briefs/).
 
 ## In short
+
 - Ten tasks went to workers, up to four at once. One of them ran on a different model, to
   fact-check the others.
 - All ten passed their own gate before reporting done. Six still needed a fix round, each for
@@ -18,6 +19,7 @@ task's brief is in [docs/plan/briefs/](plan/briefs/).
 - From the first dispatch to the last merge before the owner's review: 1 hour 24 minutes.
 
 ## Setup
+
 - skein was set up on itself with `/skein-init`, from 01:00 to 01:52: `skein init`, then an
   interview for the rules the scaffold cannot detect. It produced three invariants (no em
   dashes in the docs, portable shell for a kit that runs on macOS with bash 3.2, and Node
@@ -34,6 +36,7 @@ task's brief is in [docs/plan/briefs/](plan/briefs/).
 - The setup merged as [PR #1](https://github.com/bayological/skein/pull/1) at 01:58.
 
 ## Timeline
+
 | Task | What | Dispatched | Worker done | Fix rounds | Merged | Pull request |
 |---|---|---|---|---|---|---|
 | SK-01 | Fact sheet | 01:59 | 02:07 | 1 | 02:14 | [#3](https://github.com/bayological/skein/pull/3) |
@@ -56,6 +59,7 @@ harness for the kit, stays in the backlog.
 The README waited overnight for the owner to read it, and merged at 11:34.
 
 ## What the gate judged, and what it could not
+
 Every worker ran the gate before it reported done, and all ten passed. The coordinator ran the
 gate again before each merge, in the worker's worktree, and it passed every time.
 
@@ -79,6 +83,7 @@ passes its checks. Whether the change is true, consistent with its neighbours an
 a reader: the coordinator, or a different model.
 
 ## The cross-model fact-check
+
 SK-09 checked 171 factual claims against the fact sheet and the code: the README on SK-04's
 branch, before the owner saw it, plus the limitations page, the example's README and the demo's
 README. Of those, 168 were ok, 3 wrong and none unsourced. It measured the GIF and replayed the
@@ -95,6 +100,7 @@ The first two went back to SK-04's worker, and the third became SK-12. The table
 [docs/plan/reviews/docs-factcheck.md](plan/reviews/docs-factcheck.md).
 
 ## Findings that became tasks
+
 - Building the demo, SK-06's worker found that plain `skein init` in a copy of the example
   renders `AGENTS.md` with a prefix taken from the folder's name, while the config it keeps
   says `HS`. Workers in such a sandbox would end with an envelope `skein watch` never matches.
@@ -103,6 +109,7 @@ The first two went back to SK-04's worker, and the third became SK-12. The table
 - The fact-check's third wrong claim became SK-12, merged 2 minutes 26 seconds after dispatch.
 
 ## An incident
+
 While testing the demo's setup script, SK-06's worker sourced it from a zsh session, where
 `BASH_SOURCE` is empty. The script resolved the wrong directory, its `cd` into the sandbox
 failed, and the rest of it ran inside the worker's own worktree. The script then made two
@@ -122,6 +129,7 @@ now refuses to run outside bash, checks the kit's path, and builds the sandbox i
 that stops at the first error.
 
 ## Kit bugs found, not fixed
+
 The docs run changed no kit code. These are now briefed as follow-up tasks.
 - `skein init` without `--name` and `--prefix` derives both from the directory name even when
   it keeps an existing `.skein/config.json`, and renders `AGENTS.md` and the pre-push hook from
@@ -139,6 +147,7 @@ The docs run changed no kit code. These are now briefed as follow-up tasks.
   (`commands/init.sh:73`).
 
 ## What the coordinator got wrong
+
 - Two labels in the lifecycle diagram's brief were wrong or ambiguous, and the worker drew them
   as written.
 - The diagram briefs fixed colour, corner radius and strokes but not font weight, so the pair
@@ -150,6 +159,7 @@ The docs run changed no kit code. These are now briefed as follow-up tasks.
   every command against a failing sample caught it before dispatch.
 
 ## Other things seen
+
 - Workers read the owner's user-level instructions as well as the repository's. Those told every
   session to keep a personal task note current, so workers edited a note outside the repository,
   despite a line in the note asking them not to. The coordinator restored it each time.
