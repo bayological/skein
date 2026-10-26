@@ -85,7 +85,8 @@
       ],
       "money": false,
       "pii": false,
-      "brief": "docs/plan/briefs/SK-02.md"
+      "brief": "docs/plan/briefs/SK-02.md",
+      "done": true
     },
     {
       "id": "SK-03",
