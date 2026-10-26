@@ -487,7 +487,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-18.md",
-      "notes": "Kit bug 6. Shares lib/gate.mjs with SK-15, hence the dep. Writes a DRAFT ADR; the coordinator numbers it at merge."
+      "notes": "Kit bug 6. Shares lib/gate.mjs with SK-15, hence the dep. Writes a DRAFT ADR; the coordinator numbers it at merge.",
+      "done": true
     },
     {
       "id": "SK-19",
