@@ -5,18 +5,37 @@
 # pushes, no PRs, `skein merge` squash-merges locally. Add a remote and drop "mode" to leave it.
 # Scaffold a repo for skein: .skein/config.json, the vendored scripts, AGENTS.md, docs/plan,
 # CI, hooks and Superset lifecycle scripts. Idempotent: existing files are left alone unless
-# --force-templates; the vendored scripts are always refreshed. Runs from the kit, not from
-# a vendored copy (it needs the templates).
+# --force-templates; the vendored scripts are always refreshed. A kept .skein/config.json
+# supplies the name, prefix, base, board and driver that no flag gives, and a flag that
+# contradicts it is refused unless --force-templates, which rewrites the config.
+# Runs from the kit, not from a vendored copy (it needs the templates).
 . "$SKEIN_HOME/lib/common.sh"
 need git jq node
 [ -d "$SKEIN_HOME/templates" ] || die "init needs the kit's templates; run ~/.claude/skills/skein/bin/skein init"
 
-NAME=""; PREFIX=""; BOARD=""; DRIVER=superset; BASE=""; FORCE=""
+NAME=""; PREFIX=""; BOARD=""; DRIVER=""; BASE=""; FORCE=""
 while [ $# -gt 0 ]; do case "$1" in
   --name) NAME="$2"; shift 2 ;; --prefix) PREFIX="$2"; shift 2 ;; --board) BOARD="$2"; shift 2 ;;
   --driver) DRIVER="$2"; shift 2 ;; --base) BASE="$2"; shift 2 ;; --force-templates) FORCE=1; shift ;;
   *) die "unknown flag $1" ;; esac; done
 cd "$ROOT"
+# A kept config supplies what the flags leave out; a flag that contradicts it is refused.
+if [ -f .skein/config.json ]; then
+  from_kept() {  # from_kept <flag> <var> <jq-path>
+    local given="${!2}" kept; kept="$(cfg "$3")"
+    [ -n "$kept" ] || return 0
+    if [ -z "$given" ]; then printf -v "$2" '%s' "$kept"
+    elif [ "$given" != "$kept" ] && [ -z "$FORCE" ]; then
+      die "$1 $given differs from the kept .skein/config.json ($kept): edit the config, or rerun with --force-templates to rewrite it"
+    fi
+  }
+  from_kept --name   NAME   .name
+  from_kept --prefix PREFIX .prefix
+  from_kept --base   BASE   .baseBranch
+  from_kept --board  BOARD  .board.type
+  from_kept --driver DRIVER .driver.type
+fi
+[ -n "$DRIVER" ] || DRIVER=superset
 [ -n "$BOARD" ] || BOARD="$([ -n "$LOCAL_MODE" ] && echo none || echo github)"
 MODE="$([ -n "$LOCAL_MODE" ] && echo local)"
 [ -n "$LOCAL_MODE" ] && [ "$BOARD" = github ] && die "--board github needs an origin remote; this repo has none (local mode): use --board none or superset"
@@ -25,6 +44,11 @@ MODE="$([ -n "$LOCAL_MODE" ] && echo local)"
 [ -n "$BASE" ] || BASE="$(git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's|origin/||')"; BASE="${BASE:-main}"
 PREFIX_LC="$(tr '[:upper:]' '[:lower:]' <<<"$PREFIX")"
 VENDOR="scripts/skein"; GATE="$VENDOR/skein gate"; COORD_ENV="${PREFIX}_COORDINATOR"; ENVELOPE="${PREFIX}_WORKER"
+# The envelope and the coordinator variable other commands read, as long as the prefix they
+# were built from is still the one in force.
+if [ -f .skein/config.json ] && [ "$PREFIX" = "$(cfg .prefix)" ]; then
+  COORD_ENV="$(cfg .coordinatorEnv "$COORD_ENV")"; ENVELOPE="$(cfg .envelope "$ENVELOPE")"
+fi
 REPO="$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null || git remote get-url origin 2>/dev/null | sed -E 's#.*[:/]([^/]+/[^/]+?)(\.git)?$#\1#')"
 
 # --- detect the toolchain
