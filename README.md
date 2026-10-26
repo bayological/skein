@@ -14,7 +14,7 @@ and vendor into each repo, the way gstack does.
 ## Why it exists
 
 In March 2026 an AI QA agent, with its own GitHub account, ran for 15 days against four
-repositories of a production codebase. It opened 21 fix pull requests. 6 were merged, one of
+repositories of a production codebase. It opened 21 fix pull requests. Six were merged, one of
 them taking test coverage on a core service from 42% to 90% and adding CI coverage gates. The
 other 15 were closed. The closed ones are the reason for the rule the rest of this kit is
 built around. A worker's claim is not evidence.
@@ -30,7 +30,7 @@ built around. A worker's claim is not evidence.
   by.
 - **A plan.** `docs/plan/wps.json` is the task DAG: each task's `owned` globs, `deps`,
   `accept` commands, and money/pii flags. `skein plan` prints what is ready and which ready
-  tasks overlap. Parallelism stays safe because no two tasks own the same file.
+  tasks overlap. Parallelism stays safe as long as no two running tasks own the same file.
 - **A board.** Claims live on GitHub issues (the default outside local mode), Superset tasks,
   or nowhere for a solo run. Assigning yourself is the claim. Any number of coordinators, no
   fixed owner.
@@ -49,9 +49,12 @@ built around. A worker's claim is not evidence.
 git clone https://github.com/bayological/skein ~/.claude/skills/skein
 ~/.claude/skills/skein/setup        # registers the skills, links ~/.local/bin/skein
 ```
-Every command needs `git`, `node` and `jq`. `gh` is for the GitHub board and for pushing work,
-Superset's CLI for the Superset driver, `codex` for cross-model reviews (falls back to
-Claude). The installer prints a note for a missing one rather than stopping.
+Every command needs `git`, `node` and `jq`. `gh` serves the GitHub board and pull requests,
+so `skein review` and `skein merge` need it outside local mode. Superset's CLI serves the
+Superset board and the Superset driver, and that driver also needs the Superset app running
+on this machine. `codex` is for cross-model reviews and falls back to Claude. The installer
+checks `git`, `node`, `jq` and `gh`, and prints a note for a missing one rather than
+stopping.
 
 Then run the example in a throwaway copy. A copy with no origin remote is in local mode: no
 board, no pull requests, nothing pushed.
@@ -80,8 +83,10 @@ skein init                          # or the /skein-init skill, which also inter
 This writes `.skein/config.json`, vendors the runtime into `scripts/skein/`, and adds
 `AGENTS.md`, `docs/plan/` (runbook, coordinator prompt, onboarding, the plan), a CI
 workflow, a pre-push hook that refuses the base branch, and Superset lifecycle scripts.
-Existing files are left alone, apart from the pre-push hook, which is rendered every run. In
-local mode it writes no CI workflow. Fill in the project rules, commit, push.
+Every run copies the vendored runtime afresh and re-renders the pre-push hook, and it adds
+its line to `.gitignore` and the runtime glob to `knip.json` when they are missing. The
+templates it rendered before are left alone. In local mode it writes no CI workflow. Fill
+in the project rules, commit, push.
 
 Day to day nobody types these commands. You open a session in your checkout, paste
 `docs/plan/COORDINATOR-PROMPT.md`, and talk. The coordinator runs the commands.
@@ -91,8 +96,8 @@ Day to day nobody types these commands. You open a session in your checkout, pas
 One wave of a swarm in the example repository, about 70 seconds of terminal: `skein plan`,
 two dispatches, both workers reporting done, the gate failing HS-02 because it deleted the
 two tests its change broke, `skein send` with the failure, then two merges. Worker commits
-scripted for the recording, which is what [docs/demo/README.md](docs/demo/README.md)
-explains, along with the two stand-ins that keep the run off the network.
+scripted for the recording. [docs/demo/README.md](docs/demo/README.md) explains how, and the
+two stand-ins that keep the run off the network.
 
 ## How a task moves
 
@@ -168,14 +173,14 @@ when the pull fails.
 
 ## Limitations
 
-Every command needs `git`, `node` and `jq`; a board or a driver also needs `gh` or Superset's
-CLI, the Superset driver needs the Superset app running on this machine, and cross-model
-review falls back to a Claude model when `codex` cannot run. The secrets and test-integrity
-checks match fixed lists of key shapes and weakener tokens, so a credential or a gutted test
-shaped like none of them passes. Both read every added line of every file, so a line of prose
-that spells out one of those tokens fails the gate the way code does. `skein plan` reports
-ownership overlaps among ready tasks, and nothing refuses a dispatch of two tasks that
-overlap; the gate's base is `origin/main`, or `main`, whatever `baseBranch` says.
+Every command needs `git`, `node` and `jq`; the GitHub board and pull requests need `gh`, the
+Superset board and the Superset driver need Superset's CLI with the Superset app running on this
+machine, and cross-model review falls back to a Claude model when `codex` cannot run. The secrets
+and test-integrity checks match fixed lists of key shapes and weakener tokens, so a credential or
+a gutted test shaped like none of them passes. Both read every added line of every file, so a
+line of prose that spells out one of those tokens fails the gate the way code does. `skein plan`
+reports ownership overlaps among ready tasks, and nothing refuses a dispatch of two tasks that
+overlap; the gate's default base is `origin/main`, or `main`, whatever `baseBranch` says.
 [docs/limitations.md](docs/limitations.md) has the rest, each line traced to the fact sheet.
 
 MIT.
