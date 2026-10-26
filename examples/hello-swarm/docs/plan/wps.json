@@ -1,0 +1,84 @@
+{
+  "version": 1,
+  "project": "hello-swarm",
+  "notes": [
+    "Source of truth for the task DAG. Coordinator-owned: no task edits this file.",
+    "A task may change only paths matching its `owned` globs, plus `alwaysAllowed`. `coordinatorOwned` always wins.",
+    "`brief: null` means NOT DISPATCHABLE. Write docs/plan/briefs/<id>.md first, then set the path here.",
+    "Keep `owned` globs disjoint between tasks that run at the same time; `skein plan` prints overlaps.",
+    "money: true and pii: true make a cross-model review mandatory before merge. `done: true` is set by skein merge."
+  ],
+  "modelPolicy": {
+    "principle": "The defects that matter are found by cross-model review, whichever model wrote the code. The reviewer is where model strength has the most leverage.",
+    "structure": "disjoint file ownership per brief; known-issue notes in briefs so nobody re-investigates; fix rounds resume the author session rather than starting a fresh agent"
+  },
+  "coordinatorOwned": [
+    "AGENTS.md",
+    ".skein/**",
+    "scripts/skein/**",
+    "docs/plan/**",
+    "scripts/githooks/**",
+    ".github/**"
+  ],
+  "alwaysAllowed": [
+    "package-lock.json",
+    "docs/adr/DRAFT-*.md"
+  ],
+  "tasks": [
+    {
+      "id": "HS-01",
+      "title": "farewell function",
+      "type": "feat",
+      "slug": "farewell-function",
+      "deps": [],
+      "owned": [
+        "src/farewell.mjs",
+        "test/farewell.test.mjs"
+      ],
+      "accept": [
+        "node --test test/farewell.test.mjs"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/HS-01.md"
+    },
+    {
+      "id": "HS-02",
+      "title": "formal greeting",
+      "type": "feat",
+      "slug": "formal-greeting",
+      "deps": [],
+      "owned": [
+        "src/greet.mjs",
+        "test/greet.test.mjs"
+      ],
+      "accept": [
+        "node --test test/greet.test.mjs"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/HS-02.md",
+      "notes": "The existing tests expect the old wording. They are kept and updated, never removed: .skein/config.json has a monotonic rule on test/greet.test.mjs."
+    },
+    {
+      "id": "HS-03",
+      "title": "command line entry",
+      "type": "feat",
+      "slug": "command-line-entry",
+      "deps": [
+        "HS-01",
+        "HS-02"
+      ],
+      "owned": [
+        "bin/hello.mjs",
+        "test/cli.test.mjs"
+      ],
+      "accept": [
+        "node --test test/cli.test.mjs"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/HS-03.md"
+    }
+  ]
+}

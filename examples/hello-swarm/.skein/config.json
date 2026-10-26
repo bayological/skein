@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "name": "hello-swarm",
+  "prefix": "HS",
+  "envelope": "HS_WORKER",
+  "coordinatorEnv": "HS_COORDINATOR",
+  "plan": "docs/plan/wps.json",
+  "briefs": "docs/plan/briefs",
+  "vendor": "scripts/skein",
+  "gate": "scripts/skein/skein gate",
+  "baseBranch": "main",
+  "board": {
+    "type": "none",
+    "repo": ""
+  },
+  "driver": {
+    "type": "local"
+  },
+  "maxAgents": 6,
+  "install": "npm ci --prefer-offline --no-audit --no-fund",
+  "standard": [
+    "npm run test"
+  ],
+  "e2e": [],
+  "invariants": [],
+  "monotonic": [
+    {
+      "file": "test/greet.test.mjs",
+      "pattern": "\\btest\\("
+    }
+  ],
+  "secretPatterns": [],
+  "secretAllow": [],
+  "worker": {
+    "agent": "claude",
+    "model": "claude-opus-5",
+    "effort": "high"
+  },
+  "review": {
+    "agent": "codex",
+    "model": "gpt-6-astra",
+    "fallbackModel": "claude-fable-5-1"
+  },
+  "readyMarker": "workspace '.*' ready",
+  "setupScript": ".superset/setup.sh",
+  "setupTimeout": 300,
+  "mode": "local"
+}
