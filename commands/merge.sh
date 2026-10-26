@@ -10,7 +10,7 @@
 . "$SKEIN_HOME/lib/common.sh"; require_config; load_board; load_driver
 need jq git node; [ -n "$LOCAL_MODE" ] || need gh
 TASK=""; NOGATE=""
-while [ $# -gt 0 ]; do case "$1" in --no-gate) NOGATE=1; shift ;; -*) die "unknown flag $1" ;; *) TASK="$1"; shift ;; esac; done
+while [ $# -gt 0 ]; do case "$1" in --no-gate) NOGATE=1; shift ;; -*) die "unknown flag $1" ;; *) [ -z "$TASK" ] || die "one task per call: got $TASK and $1"; TASK="$1"; shift ;; esac; done
 [ -n "$TASK" ] || die "usage: skein merge <TASK> [--no-gate]"
 t="$(task_json "$TASK")"; ID="$(jq -r .id <<<"$t")"; BRANCH="$(task_branch "$t")"
 BASE="$(cfg .baseBranch main)"; GATE_ENTRY="$ROOT/$(cfg .vendor scripts/skein)/skein"
