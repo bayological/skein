@@ -543,6 +543,29 @@
       "pii": false,
       "brief": "docs/plan/briefs/SK-20.md",
       "notes": "Superset CLI 2.0. SK-21, a docs task, moves the citations of these files in docs/facts/FACTS.md and adds the CLI requirement to README.md and docs/limitations.md; brief it after this merges, as SK-19 followed the last kit wave."
+    },
+    {
+      "id": "SK-22",
+      "title": "A blocked review must not pass for an approving one",
+      "type": "fix",
+      "slug": "review-verdict",
+      "deps": [
+        "SK-18"
+      ],
+      "owned": [
+        "commands/review.sh",
+        "commands/merge.sh",
+        "lib/common.sh",
+        "tests/review-verdict.test.mjs"
+      ],
+      "accept": [
+        "node --test tests/review-verdict.test.mjs",
+        "bash docs/plan/accept/SK-22.sh"
+      ],
+      "money": false,
+      "pii": false,
+      "brief": "docs/plan/briefs/SK-22.md",
+      "notes": "All three defects were observed live on 6 Nov 2026 in onchain-strat-analysis, which vendors 0.2.0: a codex sandbox that died before reading a file overwrote two substantive reviews with an empty DO NOT MERGE, and that marker would have satisfied skein merge. money is false because the task touches no ledger or credential, but it changes the control that protects every money task, so the coordinator reviews it cross-model before merge regardless. commands/doctor.sh is deliberately NOT owned here: SK-20 owns it and is unmerged, so the doctor-side report of an unusable review sandbox belongs to SK-20 or a follow-up."
     }
   ]
 }
