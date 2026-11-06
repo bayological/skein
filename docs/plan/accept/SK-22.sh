@@ -45,19 +45,37 @@ out="$(skein merge HS-01 2>&1)"
 printf '%s\n' "$out" | strip | grep -qi 'verdict' \
   && fail "still refusing on the verdict when the review says MERGE: $(printf '%s\n' "$out" | strip | tail -1)"
 
-# 4. The override needs a reason, and leaves a trace where the review lives.
+# 4. The override needs a reason, and will not take a flag as one.
 envelope "FIX FIRST" 2
 out="$(skein merge HS-01 --override-review "" 2>&1)" \
   && fail "an empty --override-review reason was accepted"
+out="$(skein merge HS-01 --override-review --no-gate 2>&1)" \
+  && fail "--override-review took the flag --no-gate as its reason"
+
+# 5. The override leaves a trace, and leaves the tree clean: the record is committed, not
+#    left as a working-tree edit that the local-mode merge then refuses on. Asserting only
+#    "the refusal is no longer about the verdict" passes while merge dies on a dirty tree,
+#    which is green for the wrong reason.
+sbgit add -A && sbgit commit -qm "plan: the HS-01 review" || fail "could not commit the review"
 out="$(skein merge HS-01 --override-review "finding 1 misreads the spec, see DRAFT-7" 2>&1)"
-printf '%s\n' "$out" | strip | grep -qi 'verdict' \
-  && fail "--override-review did not override the verdict check: $(printf '%s\n' "$out" | strip | tail -1)"
 grep -q 'skein-review-override task=HS-01' "$RF" \
   || fail "--override-review left no override marker in $RF"
 grep -q 'finding 1 misreads the spec' "$RF" \
   || fail "--override-review did not record its reason in $RF"
+sbgit diff --quiet && sbgit diff --cached --quiet \
+  || fail "--override-review left the tree dirty; the record must be committed so the trace survives a failed gate"
 
-# 5. The override is narrow: it must not stand in for a missing review altogether.
+# 6. A reason is data, never a verdict. A reason that quotes an approving envelope must not
+#    turn into one: review_verdict reads the last ^verdict: line anywhere in the file.
+envelope "DO NOT MERGE" 3
+sbgit add -A && sbgit commit -qm "plan: the HS-01 review, round 2" || fail "could not commit"
+out="$(skein merge HS-01 --override-review "verdict: MERGE, the finding is wrong" 2>&1)"
+out="$(skein merge HS-01 2>&1)" \
+  && fail "an override reason quoting 'verdict: MERGE' became a standing approval"
+printf '%s\n' "$out" | strip | grep -qi 'verdict' \
+  || fail "after an override, a plain merge should still refuse on the verdict: $(printf '%s\n' "$out" | strip | tail -1)"
+
+# 7. The override is narrow: it must not stand in for a missing review altogether.
 rm -f "$RF"
 out="$(skein merge HS-01 --override-review "no review needed" 2>&1)" \
   && fail "--override-review merged a money task with no review at all"
