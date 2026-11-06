@@ -4,7 +4,10 @@
 # headless. Posts the findings as one PR comment and prints the file. Mandatory for tasks
 # marked money or pii; the coordinator triages each finding on its merits.
 # Local mode (no origin): reviews the task branch's diff against the base branch and writes
-# the findings, with the marker `skein merge` looks for, to docs/plan/reviews/<ID>.md.
+# the findings, with the marker `skein merge` looks for, to docs/plan/reviews/<ID>.md, moving
+# the previous round to <ID>.rN.md first.
+# Exits non-zero without touching <ID>.md when the round was inconclusive: no envelope, or a
+# sandbox that failed and found nothing. That output goes to <ID>.inconclusive.md instead.
 . "$SKEIN_HOME/lib/common.sh"; require_config; load_board; load_driver
 need jq; [ -n "$LOCAL_MODE" ] || need gh
 TASK=""; AGENT=""; MODEL=""
@@ -14,9 +17,15 @@ while [ $# -gt 0 ]; do case "$1" in
 t="$(task_json "$TASK")"; ID="$(jq -r .id <<<"$t")"; BRANCH="$(task_branch "$t")"; SLUG="$(task_field "$t" slug)"
 [ -z "$AGENT" ] && AGENT="$(cfg .review.agent codex)"
 [ -z "$MODEL" ] && MODEL="$(cfg .review.model)"
-# `codex` may be a shim with nothing behind it (Superset installs one); prove it runs.
-if [ "$AGENT" = codex ] && ! codex --version >/dev/null 2>&1; then
-  warn "codex not usable; falling back to claude"; AGENT=claude; MODEL="$(cfg .review.fallbackModel claude-fable-5-1)"
+# `codex` may be a shim with nothing behind it (Superset installs one), and its read-only
+# sandbox may be refused by this kernel long after `--version` succeeds; prove both, and say
+# which one failed, because "codex not usable" sent the last operator looking in the wrong place.
+if [ "$AGENT" = codex ] && ! review_agent_usable codex; then
+  case "$REVIEW_AGENT_UNUSABLE" in
+    sandbox) warn "codex runs but its sandbox does not: no unprivileged user namespace can be created here, so 'codex exec --sandbox read-only' would die before reading a file. Falling back to claude (set SKEIN_SKIP_SANDBOX_PROBE=1 to force the probe to pass)" ;;
+    *) warn "codex is not usable: 'codex --version' failed, so nothing is behind the command. Falling back to claude" ;;
+  esac
+  AGENT=claude; MODEL="$(cfg .review.fallbackModel claude-fable-5-1)"
 fi
 
 if [ -n "$LOCAL_MODE" ]; then
@@ -52,12 +61,35 @@ case "$AGENT" in
   *) die "unknown review agent $AGENT" ;;
 esac
 [ -s "$OUT" ] || die "review produced no output ($OUT)"
-grep -q "REVIEW_DONE" "$OUT" || warn "review output has no REVIEW_DONE envelope; read $OUT before trusting it"
+RDIR="$ROOT/$(cfg .reviews docs/plan/reviews)"; RFILE="$RDIR/$ID.md"
+FALLBACK="$(cfg .review.fallbackModel claude-fable-5-1)"
+# An inconclusive review is not a review, so it never takes the path `skein merge` reads and
+# never lands on a real one. A reviewer whose sandbox died before reading a single file still
+# writes output, and that output used to overwrite the findings of the round before it.
+if review_inconclusive "$OUT"; then
+  WHY="no REVIEW_DONE envelope"
+  review_sandbox_failed "$OUT" && WHY="a sandbox failure and no findings"
+  KEPT="$OUT"
+  if [ -n "$LOCAL_MODE" ]; then
+    mkdir -p "$RDIR"; KEPT="$RDIR/$ID.inconclusive.md"
+    { printf '<!-- skein-review-inconclusive task=%s reviewer=%s by=%s why=%s -->\n' "$ID" "$AGENT${MODEL:+:$MODEL}" "$(me)" "$WHY"; cat "$OUT"; } > "$KEPT"
+  fi
+  driver_delete "$WS"
+  git -C "$ROOT" branch -q -D "$RBRANCH" 2>/dev/null || true
+  die "$ID: $AGENT reported $WHY, so this is not a review. Its output is at $KEPT and $RFILE is untouched. Retry with: skein review $ID --agent claude --model $FALLBACK"
+fi
 # The marker is what `skein merge` requires for money/pii tasks: a word in a comment is not evidence.
 { printf '<!-- skein-review task=%s reviewer=%s by=%s -->\n' "$ID" "$AGENT${MODEL:+:$MODEL}" "$(me)"; cat "$OUT"; } > "$OUT.comment"
 if [ -n "$LOCAL_MODE" ]; then
-  RFILE="$ROOT/$(cfg .reviews docs/plan/reviews)/$ID.md"; mkdir -p "$(dirname "$RFILE")"
-  cp "$OUT.comment" "$RFILE" && log "wrote review to $RFILE (commit it with the plan)" && OUT="$RFILE"
+  mkdir -p "$RDIR"
+  # A new round never destroys the one before it: the previous file moves to <ID>.rN.md with
+  # the lowest free N, and the latest stays at <ID>.md, where merge looks.
+  PREV=""
+  if [ -s "$RFILE" ]; then
+    N=1; while [ -e "$RDIR/$ID.r$N.md" ]; do N=$((N+1)); done
+    PREV="$RDIR/$ID.r$N.md"; cp "$RFILE" "$PREV" || die "could not keep the previous review at $PREV; not overwriting $RFILE"
+  fi
+  cp "$OUT.comment" "$RFILE" && log "wrote review to $RFILE${PREV:+ (previous round kept at $PREV)} (commit it with the plan)" && OUT="$RFILE"
 else
   gh pr comment "$PRNUM" --body-file "$OUT.comment" >/dev/null 2>&1 && log "posted review to $PRURL" || warn "could not post the PR comment; findings are in $OUT"
 fi
