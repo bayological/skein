@@ -1,17 +1,29 @@
 #!/usr/bin/env bash
-# skein merge <TASK> [--no-gate]
+# skein merge <TASK> [--no-gate] [--override-review "<reason>"]
 # The coordinator's merge: rerun the gate in the worker's worktree, squash-merge the PR,
 # close the claim, delete the workspace (its teardown runs), then the task branch, and mark
 # the task done in the plan and log it.
 # Refuses a task claimed by someone else, never merges a money/pii task without the review
-# marker on its PR, and honours --no-gate only when the PR's CI gate check succeeded.
+# marker on its PR, never merges one whose latest review does not say `verdict: MERGE`, and
+# honours --no-gate only when the PR's CI gate check succeeded.
+# --override-review "<reason>" covers the verdict and nothing else: the marker, the gate, the
+# clean tree and the claim all still apply, and the reason is recorded where the review lives
+# before the gate runs, so an override always leaves a trace.
 # Local mode (no origin): no PR. The gate runs in the worktree as always, then the branch is
 # squash-merged into the base branch here, the review marker is a file, and nothing is pushed.
 . "$SKEIN_HOME/lib/common.sh"; require_config; load_board; load_driver
 need jq git node; [ -n "$LOCAL_MODE" ] || need gh
-TASK=""; NOGATE=""
-while [ $# -gt 0 ]; do case "$1" in --no-gate) NOGATE=1; shift ;; -*) die "unknown flag $1" ;; *) [ -z "$TASK" ] || die "one task per call: got $TASK and $1"; TASK="$1"; shift ;; esac; done
-[ -n "$TASK" ] || die "usage: skein merge <TASK> [--no-gate]"
+TASK=""; NOGATE=""; OVERRIDE=""; OVERRIDDEN=""
+while [ $# -gt 0 ]; do case "$1" in
+  --no-gate) NOGATE=1; shift ;;
+  --override-review) [ $# -ge 2 ] || die "--override-review needs a reason: say why the review is wrong, for the record"; OVERRIDDEN=1; OVERRIDE="$2"; shift 2 ;;
+  -*) die "unknown flag $1" ;;
+  *) [ -z "$TASK" ] || die "one task per call: got $TASK and $1"; TASK="$1"; shift ;;
+esac; done
+[ -n "$TASK" ] || die "usage: skein merge <TASK> [--no-gate] [--override-review \"<reason>\"]"
+# An override is a record, not a shrug: a blank reason would leave nothing behind to audit.
+[ -z "$OVERRIDDEN" ] || [ -n "$(printf '%s' "$OVERRIDE" | tr -d '[:space:]')" ] \
+  || die "--override-review needs a reason: say why the review is wrong, for the record"
 t="$(task_json "$TASK")"; ID="$(jq -r .id <<<"$t")"; BRANCH="$(task_branch "$t")"
 BASE="$(cfg .baseBranch main)"; GATE_ENTRY="$ROOT/$(cfg .vendor scripts/skein)/skein"
 
@@ -19,21 +31,48 @@ owner="$(board_owner "$ID")"; me="$(me)"
 [ -z "$owner" ] || [ "$owner" = "$me" ] || die "$ID is claimed by $owner, not you"
 
 SENSITIVE=""; { [ "$(task_field "$t" money)" = "true" ] || [ "$(task_field "$t" pii)" = "true" ]; } && SENSITIVE=1
+VERDICT=""; VERDICT_SRC=""; REVIEW_FILE=""
 if [ -n "$LOCAL_MODE" ]; then
   [ -z "$NOGATE" ] || die "--no-gate trusts a CI gate check, and local mode has no CI: run the gate"
   git -C "$ROOT" show-ref --verify --quiet "refs/heads/$BRANCH" || die "no local branch $BRANCH"
   REVIEW_FILE="$ROOT/$(cfg .reviews docs/plan/reviews)/$ID.md"
-  [ -z "$SENSITIVE" ] || grep -q "<!-- skein-review task=$ID " "$REVIEW_FILE" 2>/dev/null \
-    || die "$ID is money/pii and $REVIEW_FILE has no skein review marker: run 'skein review $ID' first"
+  if [ -n "$SENSITIVE" ]; then
+    grep -q "<!-- skein-review task=$ID " "$REVIEW_FILE" 2>/dev/null \
+      || die "$ID is money/pii and $REVIEW_FILE has no skein review marker: run 'skein review $ID' first"
+    VERDICT="$(review_verdict "$REVIEW_FILE")"; VERDICT_SRC="$REVIEW_FILE"
+  fi
 else
   PR="$(gh pr list --head "$BRANCH" --state open --json number,url,reviews,comments -q '.[0]' 2>/dev/null)"
   [ -n "$PR" ] || die "no open PR for branch $BRANCH"
   PRNUM="$(jq -r .number <<<"$PR")"; PRURL="$(jq -r .url <<<"$PR")"
   if [ -n "$SENSITIVE" ]; then
-    # Evidence is the marker `skein review` posts, from a collaborator, naming this task.
-    n="$(gh pr view "$PRNUM" --json comments -q "[.comments[] | select((.body | test(\"<!-- skein-review task=$ID \")) and (.authorAssociation | IN(\"OWNER\",\"MEMBER\",\"COLLABORATOR\")))] | length" 2>/dev/null || echo 0)"
-    [ "$n" -gt 0 ] || die "$ID is money/pii and PR #$PRNUM carries no skein review marker from a collaborator: run 'skein review $ID' first"
+    # Evidence is the marker `skein review` posts, from a collaborator, naming this task: the
+    # most recent one, because its envelope is what gets judged. One call, never a loop.
+    CBODY="${TMPDIR:-/tmp}/skein-merge-review-$ID-$$.md"
+    gh pr view "$PRNUM" --json comments -q "[.comments[] | select((.body | test(\"<!-- skein-review task=$ID \")) and (.authorAssociation | IN(\"OWNER\",\"MEMBER\",\"COLLABORATOR\")))] | last | .body // \"\"" > "$CBODY" 2>/dev/null || : > "$CBODY"
+    [ -s "$CBODY" ] || { rm -f "$CBODY"; die "$ID is money/pii and PR #$PRNUM carries no skein review marker from a collaborator: run 'skein review $ID' first"; }
+    VERDICT="$(review_verdict "$CBODY")"; VERDICT_SRC="PR #$PRNUM"; rm -f "$CBODY"
   fi
+fi
+
+# The marker proves a review ran; only its envelope says the review approved. `DO NOT MERGE`
+# used to satisfy this check exactly as well as `MERGE`, so a review that rejected the work
+# and a review that never happened both read as a pass.
+if [ -n "$SENSITIVE" ] && [ "$VERDICT" != MERGE ]; then
+  [ -n "$OVERRIDDEN" ] || die "$ID is money/pii and its latest review ($VERDICT_SRC) does not approve: verdict: ${VERDICT:-<none>}, not MERGE. Fix the findings and review again, or record an override: skein merge $ID --override-review \"<reason>\""
+  # Recorded before the gate runs, so the trace outlives a merge that then fails for another
+  # reason. Appended once: a re-run must not dirty the tree the local merge needs clean.
+  MARK="$(review_override_marker "$ID" "$me" "$VERDICT")"
+  if [ -n "$LOCAL_MODE" ]; then
+    if ! { grep -qF "$MARK" "$REVIEW_FILE" 2>/dev/null && grep -qF "$OVERRIDE" "$REVIEW_FILE" 2>/dev/null; }; then
+      printf '\n%s\n%s\n' "$MARK" "$OVERRIDE" >> "$REVIEW_FILE" \
+        || die "could not record the override in $REVIEW_FILE; not merging without the trace"
+    fi
+  else
+    printf '%s\n\n%s\n' "$MARK" "$OVERRIDE" | gh pr comment "$PRNUM" --body-file - >/dev/null 2>&1 \
+      || die "could not record the override on PR #$PRNUM; not merging without the trace"
+  fi
+  log "--override-review by $me: $ID merges though its review ($VERDICT_SRC) said ${VERDICT:-nothing}; the reason is recorded there"
 fi
 
 WS="$(driver_find "$ID")"; WPATH=""; [ -n "$WS" ] && WPATH="$(driver_path "$WS")"
