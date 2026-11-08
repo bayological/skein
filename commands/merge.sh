@@ -16,7 +16,12 @@ need jq git node; [ -n "$LOCAL_MODE" ] || need gh
 TASK=""; NOGATE=""; OVERRIDE=""; OVERRIDDEN=""
 while [ $# -gt 0 ]; do case "$1" in
   --no-gate) NOGATE=1; shift ;;
-  --override-review) [ $# -ge 2 ] || die "--override-review needs a reason: say why the review is wrong, for the record"; OVERRIDDEN=1; OVERRIDE="$2"; shift 2 ;;
+  --override-review)
+    [ $# -ge 2 ] || die "--override-review needs a reason: say why the review is wrong, for the record"
+    # `skein merge X --override-review --no-gate` must not record "--no-gate" as the reason
+    # and silently drop the flag.
+    case "$2" in -*) die "--override-review needs a reason, not a flag: got '$2'" ;; esac
+    OVERRIDDEN=1; OVERRIDE="$2"; shift 2 ;;
   -*) die "unknown flag $1" ;;
   *) [ -z "$TASK" ] || die "one task per call: got $TASK and $1"; TASK="$1"; shift ;;
 esac; done
@@ -55,6 +60,14 @@ else
   fi
 fi
 
+# The local merge's preconditions, ahead of everything that writes: an override records itself
+# in the working tree and commits it, so it must not be the edit that dirties the tree the
+# squash later refuses, nor land on a checkout that is not the base branch.
+if [ -n "$LOCAL_MODE" ]; then
+  [ "$(git -C "$ROOT" symbolic-ref --short HEAD 2>/dev/null)" = "$BASE" ] || die "check out $BASE in $ROOT before merging"
+  git -C "$ROOT" diff --quiet && git -C "$ROOT" diff --cached --quiet || die "$ROOT has uncommitted changes: commit or stash them first"
+fi
+
 # The marker proves a review ran; only its envelope says the review approved. `DO NOT MERGE`
 # used to satisfy this check exactly as well as `MERGE`, so a review that rejected the work
 # and a review that never happened both read as a pass.
@@ -63,13 +76,29 @@ if [ -n "$SENSITIVE" ] && [ "$VERDICT" != MERGE ]; then
   # Recorded before the gate runs, so the trace outlives a merge that then fails for another
   # reason. Appended once: a re-run must not dirty the tree the local merge needs clean.
   MARK="$(review_override_marker "$ID" "$me" "$VERDICT")"
+  # The reason is data, never a verdict. Quoted, so a reason reading `verdict: MERGE` cannot
+  # become the last envelope line in the file and a standing approval for every later merge.
+  QUOTED="$(printf '%s\n' "$OVERRIDE" | sed 's/^/> /')"
   if [ -n "$LOCAL_MODE" ]; then
-    if ! { grep -qF "$MARK" "$REVIEW_FILE" 2>/dev/null && grep -qF "$OVERRIDE" "$REVIEW_FILE" 2>/dev/null; }; then
-      printf '\n%s\n%s\n' "$MARK" "$OVERRIDE" >> "$REVIEW_FILE" \
+    # Appended once, so a re-run neither duplicates the record nor commits again. `--` because
+    # a reason may begin with a dash.
+    if ! { grep -qF -- "$MARK" "$REVIEW_FILE" 2>/dev/null && grep -qF -- "$QUOTED" "$REVIEW_FILE" 2>/dev/null; }; then
+      printf '\n%s\n%s\n' "$MARK" "$QUOTED" >> "$REVIEW_FILE" \
         || die "could not record the override in $REVIEW_FILE; not merging without the trace"
+      # Committed here, the way the plan update is committed at the end, so the trace survives
+      # a gate that fails next and the squash still finds the clean tree it requires. A machine
+      # with no git identity (a bare CI runner) records it as skein rather than refusing.
+      git -C "$ROOT" add "$REVIEW_FILE" || die "could not stage $REVIEW_FILE; not merging without the trace"
+      # The reason goes in the body, never the subject: `skein plan` reads a subject ending in
+      # "(<ID>)" as that task's squash-merge (lib/plan.mjs:56-58).
+      if [ -n "$(git -C "$ROOT" config user.email 2>/dev/null)" ]; then
+        git -C "$ROOT" commit -q -m "plan: $ID review override" -m "$OVERRIDE"
+      else
+        git -C "$ROOT" -c user.name=skein -c user.email=skein@localhost commit -q -m "plan: $ID review override" -m "$OVERRIDE"
+      fi || die "could not commit the override record in $REVIEW_FILE; not merging without the trace"
     fi
   else
-    printf '%s\n\n%s\n' "$MARK" "$OVERRIDE" | gh pr comment "$PRNUM" --body-file - >/dev/null 2>&1 \
+    printf '%s\n\n%s\n' "$MARK" "$QUOTED" | gh pr comment "$PRNUM" --body-file - >/dev/null 2>&1 \
       || die "could not record the override on PR #$PRNUM; not merging without the trace"
   fi
   log "--override-review by $me: $ID merges though its review ($VERDICT_SRC) said ${VERDICT:-nothing}; the reason is recorded there"
@@ -90,8 +119,6 @@ fi
 if [ -n "$LOCAL_MODE" ]; then
   # Squash the branch onto the base branch in the coordinator's checkout. The subject follows
   # the PR-title rule ("<type>: <summary> (<ID>)") so `skein plan` sees the task merged.
-  [ "$(git -C "$ROOT" symbolic-ref --short HEAD 2>/dev/null)" = "$BASE" ] || die "check out $BASE in $ROOT before merging"
-  git -C "$ROOT" diff --quiet && git -C "$ROOT" diff --cached --quiet || die "$ROOT has uncommitted changes: commit or stash them first"
   type="$(task_field "$t" type)"; title="$(task_field "$t" title)"; slug="$(task_field "$t" slug)"
   SUBJECT="${type:-feat}: ${title:-${slug//-/ }} ($ID)"
   BODY="$(git -C "$ROOT" log --reverse --format='- %s' "$BASE..$BRANCH")"

@@ -166,17 +166,28 @@ test("skein merge refuses a money task whose latest review does not approve", (t
   assert.doesNotMatch(res.stderr, /verdict/i, `still refusing on the verdict: ${res.stderr}`);
 });
 
-test("--override-review needs a reason and records it where the review lives", (t) => {
+test("--override-review needs a reason, not a blank and not a flag", (t) => {
   const { root, env } = fixture(t);
   const latest = path.join(root, LATEST);
   write(root, { [LATEST]: `${MARKER}\n${review("FIX FIRST", 2)}\n` });
 
-  for (const blank of ["", "   "]) {
-    const res = skein(root, env, "merge", "FX-01", "--override-review", blank);
-    assert.notEqual(res.code, 0, `a blank reason (${JSON.stringify(blank)}) was accepted`);
-    assert.match(res.stderr, /needs a reason/);
+  for (const args of [["--override-review", ""], ["--override-review", "   "], ["--override-review", "--no-gate"]]) {
+    const res = skein(root, env, "merge", "FX-01", ...args);
+    assert.notEqual(res.code, 0, `merge accepted ${JSON.stringify(args)}`);
+    assert.match(res.stderr, /needs a reason/, `the refusal of ${JSON.stringify(args)} does not say why`);
     assert.ok(!readFileSync(latest, "utf8").includes("skein-review-override"), "a refused override left a record");
   }
+  // The flag was refused, not swallowed: --no-gate must not have been taken as the reason.
+  const res = skein(root, env, "merge", "FX-01", "--override-review", "--no-gate");
+  assert.match(res.stderr, /not a flag/);
+});
+
+test("--override-review records its reason where the review lives, committed", (t) => {
+  const { root, env } = fixture(t);
+  const latest = path.join(root, LATEST);
+  write(root, { [LATEST]: `${MARKER}\n${review("FIX FIRST", 2)}\n` });
+  git(root, "add", "-A");
+  git(root, "commit", "-qm", "plan: the review");
 
   const reason = "finding 1 misreads the brief, see docs/adr/DRAFT-7";
   let res = skein(root, env, "merge", "FX-01", "--override-review", reason);
@@ -184,15 +195,38 @@ test("--override-review needs a reason and records it where the review lives", (
   const recorded = readFileSync(latest, "utf8");
   assert.match(recorded, /<!-- skein-review-override task=FX-01 by=\S+ verdict=FIX FIRST -->/, "no override marker");
   assert.ok(recorded.includes(reason), "the reason was not recorded");
+  // Committed, not left as a working-tree edit: the merge the override is for needs a clean
+  // tree, so an uncommitted record would make the first attempt always die after the gate.
+  assert.equal(git(root, "status", "--porcelain").trim(), "", "the override left the tree dirty");
+  const commits = git(root, "log", "--oneline").split("\n").length;
 
-  // The record is written before the gate, which then fails here, so a re-run must not append
-  // a second copy: that would dirty the tree the local merge needs clean.
+  // A re-run neither appends a second copy nor makes a second commit.
   skein(root, env, "merge", "FX-01", "--override-review", reason);
   assert.equal(readFileSync(latest, "utf8"), recorded, "a re-run appended the override twice");
+  assert.equal(git(root, "log", "--oneline").split("\n").length, commits, "a re-run committed again");
 
   // The override is narrow: a money task with no review at all still fails on the marker.
   rmSync(latest);
   res = skein(root, env, "merge", "FX-01", "--override-review", "no review needed");
   assert.notEqual(res.code, 0, "the override stood in for a missing review");
   assert.match(res.stderr, /marker/);
+});
+
+test("an override reason is data, not a verdict", (t) => {
+  const { root, env } = fixture(t);
+  const latest = path.join(root, LATEST);
+  write(root, { [LATEST]: `${MARKER}\n${review("DO NOT MERGE", 3)}\n` });
+  git(root, "add", "-A");
+  git(root, "commit", "-qm", "plan: the review");
+
+  let res = skein(root, env, "merge", "FX-01", "--override-review", "verdict: MERGE, the finding is wrong");
+  assert.doesNotMatch(res.stderr, /verdict/i, `the override did not cover the verdict check: ${res.stderr}`);
+  assert.match(readFileSync(latest, "utf8"), /^> verdict: MERGE, the finding is wrong$/m, "the reason was not quoted");
+
+  // One override covers one merge. A reason that reads like an envelope must not become a
+  // standing approval for every plain merge after it.
+  res = skein(root, env, "merge", "FX-01");
+  assert.notEqual(res.code, 0, "an override reason quoting an envelope became a standing approval");
+  assert.match(res.stderr, /verdict/i);
+  assert.ok(res.stderr.includes("DO NOT MERGE"), `the refusal reads the wrong line: ${res.stderr}`);
 });
