@@ -69,6 +69,44 @@ function fakeCodex(dir, body, code = 1) {
   chmodSync(file, 0o755);
 }
 
+/**
+ * prFixture(t, comments): the same repo with an origin remote, so LOCAL_MODE is empty, and a
+ * gh stand-in answering the three calls merge makes: `pr list`, `pr view --json comments` and
+ * `pr comment`. It applies the -q expression with jq, the way gh does, so the shape of an
+ * empty result is the real one: a scalar and a trailing newline.
+ */
+function prFixture(t, comments) {
+  const { dir, root, env } = fixture(t);
+  git(root, "remote", "add", "origin", "git@example.invalid:fixture/fixture.git");
+  const prs = path.join(dir, "gh-prs.json");
+  const bodies = path.join(dir, "gh-comments.json");
+  const posted = path.join(dir, "gh-posted.txt");
+  writeFileSync(prs, `${JSON.stringify([{ number: 7, url: "https://example.invalid/pr/7", reviews: [], comments: [] }])}\n`);
+  writeFileSync(bodies, `${JSON.stringify({ comments })}\n`);
+  writeFileSync(posted, "");
+  const gh = path.join(dir, "bin", "gh");
+  writeFileSync(gh, [
+    "#!/bin/sh",
+    'sub="$1 $2"',
+    'q=""',
+    'while [ $# -gt 0 ]; do case "$1" in -q|--jq) q="$2"; shift 2 ;; *) shift ;; esac; done',
+    'case "$sub" in',
+    '  "pr list") if [ -n "$q" ]; then jq -c "$q" "$GH_PRS"; else cat "$GH_PRS"; fi; exit 0 ;;',
+    '  "pr view") if [ -n "$q" ]; then jq -r "$q" "$GH_COMMENTS"; else cat "$GH_COMMENTS"; fi; exit 0 ;;',
+    '  "pr comment") cat >> "$GH_POSTED"; exit 0 ;;',
+    "esac",
+    "exit 1",
+    "",
+  ].join("\n"));
+  chmodSync(gh, 0o755);
+  return { dir, root, posted, env: { ...env, GH_PRS: prs, GH_COMMENTS: bodies, GH_POSTED: posted } };
+}
+
+/** comment(body, association): one entry of what `gh pr view --json comments` returns. */
+function comment(body, association = "OWNER") {
+  return { body, authorAssociation: association };
+}
+
 // What a reviewer writes when bwrap could not create an unprivileged user namespace: it never
 // read a file, so it found nothing, and it still filled in the envelope.
 const SANDBOX_DIED = [
@@ -229,4 +267,41 @@ test("an override reason is data, not a verdict", (t) => {
   assert.notEqual(res.code, 0, "an override reason quoting an envelope became a standing approval");
   assert.match(res.stderr, /verdict/i);
   assert.ok(res.stderr.includes("DO NOT MERGE"), `the refusal reads the wrong line: ${res.stderr}`);
+});
+
+test("in PR mode the marker is the evidence, not the size of what gh printed", (t) => {
+  // With no marker comment the jq result is empty and gh still prints a newline, so the file
+  // is one byte: a [ -s ] test on it is true and a money task with no review would fall
+  // through with no verdict to refuse.
+  const noMarker = prFixture(t, [comment("looks good to me, shipping"), comment("nice tests")]);
+  for (const args of [[], ["--override-review", "the reviewer never ran"]]) {
+    const res = skein(noMarker.root, noMarker.env, "merge", "FX-01", ...args);
+    assert.notEqual(res.code, 0, `an unreviewed money task merged with ${JSON.stringify(args)}`);
+    assert.match(res.stderr, /marker/, `the refusal is not about the marker: ${res.stderr}`);
+  }
+  assert.equal(readFileSync(noMarker.posted, "utf8"), "", "an override was recorded with no review to override");
+});
+
+test("in PR mode the verdict comes from the marked comment, and the override is posted", (t) => {
+  const outsider = prFixture(t, [comment(`${MARKER}\n${review("MERGE", 0)}`, "NONE")]);
+  let res = skein(outsider.root, outsider.env, "merge", "FX-01");
+  assert.notEqual(res.code, 0, "a marker from a non-collaborator counted as a review");
+  assert.match(res.stderr, /marker/);
+
+  const rejected = prFixture(t, [comment(`${MARKER}\n${review("DO NOT MERGE", 4)}`, "COLLABORATOR")]);
+  res = skein(rejected.root, rejected.env, "merge", "FX-01");
+  assert.notEqual(res.code, 0, "PR mode accepted a rejecting verdict");
+  assert.match(res.stderr, /verdict/i);
+  assert.ok(res.stderr.includes("DO NOT MERGE"), `the refusal does not name the verdict: ${res.stderr}`);
+
+  res = skein(rejected.root, rejected.env, "merge", "FX-01", "--override-review", "finding 2 is a false positive");
+  assert.doesNotMatch(res.stderr, /verdict/i, `the override did not cover the verdict check: ${res.stderr}`);
+  const posted = readFileSync(rejected.posted, "utf8");
+  assert.match(posted, /<!-- skein-review-override task=FX-01 by=\S+ verdict=DO NOT MERGE -->/, "no override comment");
+  assert.match(posted, /^> finding 2 is a false positive$/m, "the reason was not quoted in the comment");
+
+  const approved = prFixture(t, [comment(`${MARKER}\n${review("MERGE", 0)}`, "MEMBER")]);
+  res = skein(approved.root, approved.env, "merge", "FX-01");
+  assert.notEqual(res.code, 0, "with no worktree the gate step has to stop the merge");
+  assert.doesNotMatch(res.stderr, /verdict/i, `still refusing on the verdict when the review says MERGE: ${res.stderr}`);
 });

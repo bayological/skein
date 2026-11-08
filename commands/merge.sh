@@ -55,7 +55,11 @@ else
     # most recent one, because its envelope is what gets judged. One call, never a loop.
     CBODY="${TMPDIR:-/tmp}/skein-merge-review-$ID-$$.md"
     gh pr view "$PRNUM" --json comments -q "[.comments[] | select((.body | test(\"<!-- skein-review task=$ID \")) and (.authorAssociation | IN(\"OWNER\",\"MEMBER\",\"COLLABORATOR\")))] | last | .body // \"\"" > "$CBODY" 2>/dev/null || : > "$CBODY"
-    [ -s "$CBODY" ] || { rm -f "$CBODY"; die "$ID is money/pii and PR #$PRNUM carries no skein review marker from a collaborator: run 'skein review $ID' first"; }
+    # The marker is the evidence, never the file's size: with no such comment the jq result is
+    # empty and `gh` still prints a newline, so a one-byte file would pass a [ -s ] test and a
+    # money task with no review at all would fall through with no verdict to refuse.
+    grep -q "<!-- skein-review task=$ID " "$CBODY" 2>/dev/null \
+      || { rm -f "$CBODY"; die "$ID is money/pii and PR #$PRNUM carries no skein review marker from a collaborator: run 'skein review $ID' first"; }
     VERDICT="$(review_verdict "$CBODY")"; VERDICT_SRC="PR #$PRNUM"; rm -f "$CBODY"
   fi
 fi
