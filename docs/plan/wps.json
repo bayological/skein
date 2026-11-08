@@ -565,7 +565,8 @@
       "money": false,
       "pii": false,
       "brief": "docs/plan/briefs/SK-22.md",
-      "notes": "All three defects were observed live on 6 Nov 2026 in onchain-strat-analysis, which vendors 0.2.0: a codex sandbox that died before reading a file overwrote two substantive reviews with an empty DO NOT MERGE, and that marker would have satisfied skein merge. money is false because the task touches no ledger or credential, but it changes the control that protects every money task, so the coordinator reviews it cross-model before merge regardless. commands/doctor.sh is deliberately NOT owned here: SK-20 owns it and is unmerged, so the doctor-side report of an unusable review sandbox belongs to SK-20 or a follow-up."
+      "notes": "All three defects were observed live on 6 Nov 2026 in onchain-strat-analysis, which vendors 0.2.0: a codex sandbox that died before reading a file overwrote two substantive reviews with an empty DO NOT MERGE, and that marker would have satisfied skein merge. money is false because the task touches no ledger or credential, but it changes the control that protects every money task, so the coordinator reviews it cross-model before merge regardless. commands/doctor.sh is deliberately NOT owned here: SK-20 owns it and is unmerged, so the doctor-side report of an unusable review sandbox belongs to SK-20 or a follow-up.",
+      "done": true
     }
   ]
 }
