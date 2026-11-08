@@ -95,5 +95,66 @@ load_driver() { local f="$SKEIN_HOME/lib/drivers/$DRIVER_TYPE.sh"; [ -f "$f" ] |
 # Who am I, for claims. GitHub login when gh is present, else the OS user.
 me() { gh api user -q .login 2>/dev/null || id -un; }
 
+# Review output. `skein review` writes it and `skein merge` judges it, so the reading of it
+# lives here and both see the same lines.
+
+# review_verdict <file>: the value of the LAST line that begins `verdict:`, uppercased and
+# trimmed, or nothing. A reviewer's prose may use the word, so the match is anchored and only
+# the envelope counts; the last one wins, because a later round appends.
+review_verdict() {
+  [ -f "${1:-}" ] || return 0
+  LC_ALL=C sed -n 's/^verdict:[[:space:]]*//p' "$1" 2>/dev/null | tail -1 \
+    | tr -d '\r' | tr '[:lower:]' '[:upper:]' | sed 's/[[:space:]]*$//'
+  return 0
+}
+
+# The words a sandbox that never started leaves behind: bwrap prints them when the kernel or a
+# non-setuid binary refuses an unprivileged user namespace, and the reviewer then apologises
+# into its output file instead of reviewing.
+REVIEW_SANDBOX_SIGNATURE='bwrap:|RTM_NEWADDR|setting up uid map|Failed to create'
+
+# review_sandbox_failed <file>: true when the output carries one of those signatures.
+review_sandbox_failed() { LC_ALL=C grep -qE "$REVIEW_SANDBOX_SIGNATURE" "${1:-}" 2>/dev/null; }
+
+# review_inconclusive <file>: true when the output is not a real review, either because it
+# carries no REVIEW_DONE envelope at all, or because it carries a sandbox-failure signature
+# AND reports no findings. Both halves, so a genuine review that quotes one of those strings
+# inside a finding survives.
+review_inconclusive() {
+  local f="${1:-}"
+  [ -s "$f" ] || return 0
+  grep -q 'REVIEW_DONE' "$f" 2>/dev/null || return 0
+  review_sandbox_failed "$f" && LC_ALL=C grep -qE '^findings:[[:space:]]*0[[:space:]]*$' "$f" 2>/dev/null
+}
+
+# review_agent_usable <agent>: can this agent actually produce a review on this machine?
+# Sets REVIEW_AGENT_UNUSABLE to the check that failed, "version" or "sandbox", so the caller
+# can say which. Free and fast: no model call. A version is not enough for codex, whose
+# read-only sandbox needs an unprivileged user namespace: where one is refused,
+# `codex --version` still exits 0 while `codex exec --sandbox read-only` dies before reading a
+# file. SKEIN_SKIP_SANDBOX_PROBE=1 forces the probe to pass, for a CI that is sandboxed
+# correctly and for the kit's own tests.
+REVIEW_AGENT_UNUSABLE=""
+review_agent_usable() {
+  local agent="${1:-}"
+  REVIEW_AGENT_UNUSABLE=""
+  "$agent" --version >/dev/null 2>&1 || { REVIEW_AGENT_UNUSABLE=version; return 1; }
+  [ "$agent" = codex ] || return 0
+  [ "${SKEIN_SKIP_SANDBOX_PROBE:-}" = 1 ] && return 0
+  if command -v bwrap >/dev/null 2>&1; then
+    bwrap --ro-bind / / --unshare-user true >/dev/null 2>&1 && return 0
+  elif command -v unshare >/dev/null 2>&1; then
+    unshare --user --map-root-user true >/dev/null 2>&1 && return 0
+  else
+    return 0   # nothing here to probe (macOS, where codex sandboxes with Seatbelt)
+  fi
+  REVIEW_AGENT_UNUSABLE=sandbox; return 1
+}
+
+# review_override_marker <id> <by> <verdict>: the auditable line `skein merge
+# --override-review` leaves where the review lives. It writes `verdict=` and not `verdict:`,
+# so review_verdict can never read an override as an approval.
+review_override_marker() { printf '<!-- skein-review-override task=%s by=%s verdict=%s -->' "$1" "$2" "${3:-none}"; }
+
 # One JSON line to stdout: the machine-readable result every running command ends with.
 emit() { jq -cn "$@"; }
